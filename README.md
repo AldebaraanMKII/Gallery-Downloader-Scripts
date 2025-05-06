@@ -17,6 +17,7 @@ A collection of PowerShell scripts to download images/videos from various websit
 - Handle authentication procedures (CivitAI/DeviantArt)
 - Add local files as favorites to the database for later reference
 - Log all activities in the logs subfolder
+- Continue from where you left off
 
 ## Supported Sites
 
