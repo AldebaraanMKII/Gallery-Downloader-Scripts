@@ -18,6 +18,8 @@ A collection of PowerShell scripts to download images/videos from various websit
 - Add local files as favorites to the database for later reference
 - Log all activities in the logs subfolder
 - Continue from where you left off
+- (DeviantArt/Kemono) Filter titles of posts, only add into database what you want
+- (Kemono) Filter filetypes
 
 ## Supported Sites
 
