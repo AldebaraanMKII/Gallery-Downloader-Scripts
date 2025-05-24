@@ -71,9 +71,18 @@ function Download-Files-From-Database {
 						foreach ($Post in $result) {
 							$PostID = $Post.postID
 							$PostTitle = $Post.title
-							$PostDatePublished = $Post.date_published
-							$PostDatePublishedFormatted = [datetime]::ParseExact($PostDatePublished, "yyyy-MM-dd HH:mm:ss", $null).ToString("yyyy-MM-dd HH-mm-ss")
-							$PostDatePublishedFormattedShort = [datetime]::ParseExact($PostDatePublished, "yyyy-MM-dd HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
+							# $PostDatePublished = $Post.date_published
+							
+							# Check if is null or empty
+							if ($Post.date_published) 
+							{ 
+								$PostDatePublished = $Post.date_published 
+								$PostDatePublishedFormatted = [datetime]::ParseExact($PostDatePublished, "yyyy-MM-dd HH:mm:ss", $null).ToString("yyyy-MM-dd HH-mm-ss")
+								$PostDatePublishedFormattedShort = [datetime]::ParseExact($PostDatePublished, "yyyy-MM-dd HH:mm:ss", $null).ToString("yyyy-MM-dd")
+							} else { 
+								$PostDatePublishedFormatted = "Null" 
+								$PostDatePublishedFormattedShort = "Null" 
+							}
 							
 							$PostTotalFiles = $Post.total_files
 							
@@ -138,7 +147,7 @@ function Download-Files-From-Database {
 function Download-Metadata-From-Creator {
     param (
         [string]$CreatorName,
-        [int]$CreatorID,
+        [string]$CreatorID,
         [string]$Service,
         [string]$WordFilter,
         [string]$WordFilterExclude,
@@ -180,6 +189,9 @@ function Download-Metadata-From-Creator {
 			
 			$DateIndexed = $DateIndexed -replace 'T', ' ' -replace '\.\d+', ''
 			$DateUpdated = $DateUpdated -replace 'T', ' ' -replace '\.\d+', ''
+			
+			# Write-Host "DateIndexed: $DateIndexed"
+			# Write-Host "DateUpdated: $DateUpdated"
 			
 			$DateIndexedFormatted = [datetime]::ParseExact($DateIndexed, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
 			$DateUpdatedFormatted = [datetime]::ParseExact($DateUpdated, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
@@ -316,18 +328,31 @@ function Download-Metadata-From-Creator {
 									$PostTitle = $PostTitle -replace "'", "''"
 									$PostContent = $PostContent -replace "'", "''"
 									
-									$PostDateAdded = $Post.added
-									$PostDatePublished = $Post.published
+									# $PostDateAdded = $Post.added
+									# $PostDatePublished = $Post.published
+									
+									# Check if is null or empty
+									if ($Post.added) 
+									{ 
+										$PostDateAdded = $Post.added 
+										$PostDateAdded = $PostDateAdded -replace 'T', ' ' -replace '\.\d+', ''									
+										$PostDateAddedFormatted = [datetime]::ParseExact($PostDateAdded, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
+									} else { 
+										$PostDateAddedFormatted = "Null" 
+									}
+									
+									if ($Post.published) 
+									{ 
+										$PostDatePublished = $Post.published 
+										$PostDatePublished = $PostDatePublished -replace 'T', ' ' -replace '\.\d+', ''
+										$PostDatePublishedFormatted = [datetime]::ParseExact($PostDatePublished, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
+									} else { 
+										$PostDatePublishedFormatted = "Null" 
+									}
 
 									# "added": "2024-08-27T17:26:54.105855",
 									# "published": "2024-08-26T23:13:16",
 									# "edited": "2024-08-26T23:13:16",
-									
-									$PostDateAdded = $PostDateAdded -replace 'T', ' ' -replace '\.\d+', ''
-									$PostDatePublished = $PostDatePublished -replace 'T', ' ' -replace '\.\d+', ''
-									
-									$PostDateAddedFormatted = [datetime]::ParseExact($PostDateAdded, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
-									$PostDatePublishedFormatted = [datetime]::ParseExact($PostDatePublished, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
 									
 									$temp_query = "INSERT INTO Posts (postID, creatorName, title, content, date_published, date_added, downloaded) 
 																VALUES ('$PostID', '$CreatorName', '$PostTitle', '$PostContent', '$PostDatePublishedFormatted', '$PostDateAddedFormatted', 0);"
@@ -408,7 +433,7 @@ function Download-Metadata-From-Creator {
 										}
 									}
 ############################################
-############################################
+############################################ #process attachments
 									if ($Post.attachments.Count -gt 0) {
 										Write-Host "Number of files (attachments): $($Post.attachments.Count)" -ForegroundColor Green
 										foreach ($File in $Post.attachments) {
@@ -571,7 +596,7 @@ function Download-Metadata-From-Creator {
 #create database file if it doesn`t exist
 if (-not (Test-Path $DBFilePath)) {
 	$createTableQuery = "CREATE TABLE Creators (
-		creatorID INTEGER PRIMARY KEY,
+		creatorID TEXT PRIMARY KEY,
 		creatorName TEXT,
 		service TEXT,
 		date_indexed TEXT,
@@ -584,7 +609,7 @@ if (-not (Test-Path $DBFilePath)) {
 	
 	
 	$createTableQuery = "CREATE TABLE Posts (
-		postID INTEGER PRIMARY KEY,
+		postID TEXT PRIMARY KEY,
 		creatorName TEXT,
 		title TEXT,
 		content TEXT,
@@ -604,7 +629,7 @@ if (-not (Test-Path $DBFilePath)) {
 		url TEXT,
 		file_index INTEGER DEFAULT 0,
 		creatorName TEXT,
-		postID INTEGER DEFAULT 0,
+		postID TEXT,
 		downloaded INTEGER DEFAULT 0,
 		favorite INTEGER DEFAULT 0,
 		deleted INTEGER DEFAULT 0
