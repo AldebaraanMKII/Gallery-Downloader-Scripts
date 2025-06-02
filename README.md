@@ -77,3 +77,21 @@ Examples:
 
 Use a tool like HeidiSQL to open the database and check the column names for constructing queries.
 Note: when using the query to download the items will be downloaded by ID/Hash/GUID or whatever the unique column in the database for that site is.
+
+
+### Favorites (Option 5)
+Set the directory in the $FavoriteScanFolder variable in the respective configuration script.
+
+The script will scan for any files in that folder, and any subfolders.
+
+The files will be added if they have a pattern in their filename: 
+
+- Rule34xxx = MD5/SHA-1
+- CivitAI/DeviantArt = UUID
+- Kemono = SHA256
+
+
+
+### TODO list
+- Add concurrent downloads
+- Add CivitAI tag filter
