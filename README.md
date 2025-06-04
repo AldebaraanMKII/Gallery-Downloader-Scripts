@@ -14,12 +14,13 @@ A collection of PowerShell scripts to download images/videos from various websit
 - Skip username/query when encountering items already in the database (configurable)
 - Skip username/query if already fetched within a configurable time period
 - Convert files after download using FFMPEG (configurable)
-- Handle authentication procedures (CivitAI/DeviantArt)
-- Add local files as favorites to the database for later reference
+- (CivitAI/DeviantArt) Handle authentication procedures
+- Add local files as favorites to the database, so that they can be downloaded quickly without needing to sort things again
 - Log all activities in the logs subfolder
-- Continue from where you left off
+- Continue from where you left off when closing the script
 - (DeviantArt/Kemono) Filter titles of posts, only add into database what you want
 - (Kemono) Filter filetypes
+- (Rule34xxx) Automatically deals with 200 page limit of the API
 
 ## Supported Sites
 
@@ -75,3 +76,22 @@ Examples:
 - `WHERE username = 'username1' AND downloaded = 0` - will download all files not already downloaded from username "username1"
 
 Use a tool like HeidiSQL to open the database and check the column names for constructing queries.
+Note: when using the query to download the items will be downloaded by ID/Hash/GUID or whatever the unique column in the database for that site is.
+
+
+### Favorites (Option 5)
+Set the directory in the $FavoriteScanFolder variable in the respective configuration script.
+
+The script will scan for any files in that folder, and any subfolders.
+
+The files will be added if they have a pattern in their filename: 
+
+- Rule34xxx = MD5/SHA-1
+- CivitAI/DeviantArt = UUID
+- Kemono = SHA256
+
+
+
+### TODO list
+- Add concurrent downloads
+- Add CivitAI tag filter
