@@ -37,6 +37,9 @@ $TimeToCheckAgainDownload = 168
 #time to wait between requests
 $TimeToWait = 2000
 ###############################
+#max parallel downloads. Not recommended to set this above the default unless you like to be rate limited.
+$MaxConcurrentDownloads = 1
+###############################
 #Backup database on metadata/download start, 7zip needs to be installed and in PATH
 $BackupDBOnStart = $false
 ###############################

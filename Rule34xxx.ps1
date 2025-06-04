@@ -205,7 +205,7 @@ function Download-Metadata-From-Query {
 					# Check the result
 					if ($result.Count -gt 0) {
 						$Results_per_Page = $result[0].results_per_page
-						Write-Host "Loading $Results_per_Page results per page." -ForegroundColor Green
+						Write-Host "Fetching $Results_per_Page results per page." -ForegroundColor Green
 					}
 ###########################
 				}

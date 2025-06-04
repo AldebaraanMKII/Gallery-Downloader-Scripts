@@ -124,7 +124,7 @@ function Download-Files-From-Database {
 	} elseif ($Type -eq 2) {
 		$WhereQuery = $(Write-Host "`nEnter WHERE query:" -ForegroundColor cyan -NoNewLine; Read-Host)
 		
-		$temp_query = "SELECT hash, hash_extension, filename, filename_extension, url, file_index, creatorID, creatorName FROM Files $WhereQuery;"
+		$temp_query = "SELECT creatorName, hash, hash_extension, filename, filename_extension, url, file_index, creatorID  FROM Files $WhereQuery;"
 
 		# Write-Host "temp_query: $temp_query" -ForegroundColor Yellow
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -216,17 +216,7 @@ function Download-Metadata-From-Creator {
 		Write-Host "New creator $CreatorName added to database." -ForegroundColor Green
 	} else {
 		Write-Host "found creator $CreatorName in database." -ForegroundColor Green
-###########################
-		#load page_offset and start search from there
-		$temp_query = "SELECT page_offset FROM Creators WHERE creatorID = '$CreatorID' AND service = '$Service'"
-		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-		
-		# Check the result
-		if ($result.Count -gt 0) {
-			$Cur_Offset = $result[0].page_offset
-			Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
-		}
-		
+############################################
 		#load last_time_fetched_metadata
 		$temp_query = "SELECT last_time_fetched_metadata FROM Creators WHERE creatorID = '$CreatorID' AND service = '$Service'"
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -237,16 +227,27 @@ function Download-Metadata-From-Creator {
 			if ($DateDownloadCompleted -gt $DateUpdatedFormatted) {
 				$HasMoreFiles = $false
 				Write-Host "The date this creator metadata was last fetched is higher than the date this creator was updated. Skipping..." -ForegroundColor Yellow
-###########################
-			} 
-			#} else {
-			# }
-###########################
+############################################
+			} else {
+				#load page_offset and start search from there
+				$temp_query = "SELECT page_offset FROM Creators WHERE creatorID = '$CreatorID' AND service = '$Service'"
+				$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+				
+				# Check the result
+				if ($result.Count -gt 0) {
+					if ($result[0].cur_offset -gt 0) {
+						$Cur_Offset = $result[0].page_offset
+						Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
+					} else {
+						$Cur_Offset = 0
+					}
+				}
+############################################
+			}
+############################################
 		}
-##########################################
-###########################
+############################################
 	}
-###########################
 ############################################
 ############################################
 		$CurrentSkips = 0
@@ -259,7 +260,11 @@ function Download-Metadata-From-Creator {
 				$URL = "$($BaseURL)/$Service/user/$($CreatorID)?o=$Cur_Offset"
 				Write-Host "`nURL: $URL" -ForegroundColor Yellow
 				
-				Write-Host "`nFetching metadata for offset $Cur_Offset for creator $CreatorName..." -ForegroundColor Green
+				if ($Cur_Offset -gt 0) {
+					Write-Host "`nFetching metadata for offset $Cur_Offset for creator $CreatorName..." -ForegroundColor Green
+				} else {
+					Write-Host "`nFetching metadata for creator $CreatorName..." -ForegroundColor Green
+				}
 ############################################
 				try {
 					# Make the API request and process the JSON response
@@ -540,7 +545,7 @@ function Download-Metadata-From-Creator {
 ##########################################
 						#handle errors like skip limit reached
 						} else {
-							#update the Cur_Offset column so that next time the script is run it starts from the beginning
+							#update the page_offset column so that next time the script is run it starts from the beginning
 							$temp_query = "UPDATE Creators SET page_offset = 0 WHERE creatorID = '$CreatorID' AND service = '$Service'"
 							# Write-Host "`ntemp_query for line 399: $temp_query"
 							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query

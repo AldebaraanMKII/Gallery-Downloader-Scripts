@@ -92,7 +92,7 @@ function Download-Files-From-Database {
 	} elseif ($Type -eq 2) {
 		$WhereQuery = $(Write-Host "`nEnter WHERE query:" -ForegroundColor cyan -NoNewLine; Read-Host)
 		
-		$temp_query = "SELECT id, filename, extension, width, height, url, createdAt, username FROM Files $WhereQuery;"
+		$temp_query = "SELECT username, id, filename, extension, width, height, url, createdAt FROM Files $WhereQuery;"
 
 		# Write-Host "temp_query: $temp_query" -ForegroundColor Yellow
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -179,21 +179,6 @@ function Download-Metadata-From-User {
 		Write-Host "`nfound user $Username in database." -ForegroundColor Green
 ###########################
 ##########################################
-		#load cur_cursor and start search from there
-		$temp_query = "SELECT cur_cursor FROM Users WHERE username = '$Username'"
-		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-		
-		# Check the result
-		if ($result.Count -gt 0) {
-			if ($result[0].cur_cursor -ne 'NULL') {
-				$Cursor = $result[0].cur_cursor
-				$CursorString = "&cursor=$Cursor"
-				Write-Host "Starting from cursor $Cursor." -ForegroundColor Green
-			} else {
-				$CursorString = ""
-			}
-		}
-		
 		#load last_time_fetched_metadata and start search from there
 		$temp_query = "SELECT last_time_fetched_metadata FROM Users WHERE username = '$Username'"
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -219,13 +204,25 @@ function Download-Metadata-From-User {
 					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 					
 ###########################
-					$query = "SELECT total_files FROM Users WHERE username = '$Username';"
-					$result = Invoke-SQLiteQuery -Database $DBFilePath -Query $query
-					# Check the result
-					if ($result.Count -gt 0) {
-						$TotalFiles = $result[0].total_files
-						# Write-Host "Total files for user $($Username): $TotalFiles"
+				# Load cur_cursor and start search from there
+				$temp_query = "SELECT cur_cursor FROM Users WHERE username = '$Username'"
+				$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+				
+				# Check the result
+				if ($result.Count -gt 0) {
+					# Ensure proper NULL checking
+					if ($result[0].cur_cursor -ne $null) {
+						$Cursor = $result[0].cur_cursor
+						$CursorString = "&cursor=$Cursor"
+						Write-Host "Starting from cursor $Cursor." -ForegroundColor Green
+					} else {
+						$CursorString = ""
+						# Write-Host "No valid cursor found, starting fresh." -ForegroundColor Yellow
 					}
+				} else {
+					Write-Host "User not found or query returned no results." -ForegroundColor Red
+				}
+					
 ###########################
 				}
 ###########################
@@ -276,7 +273,7 @@ function Download-Metadata-From-User {
 					# Write-Host "`nURL: $URL" -ForegroundColor Yellow
 					Write-Host "`nURL: $ConsoleURL" -ForegroundColor Yellow	#users can share this in case of bugs
 					
-					if ($CursorString -ne "") {
+					if ($CursorString.Trim() -ne "") {
 						Write-Host "`nFetching metadata for cursor $Cursor for user $Username (Rating: $Rating)..." -ForegroundColor Yellow
 					} else {
 						Write-Host "`nFetching metadata for user $Username (Rating: $Rating)..." -ForegroundColor Yellow
@@ -385,7 +382,7 @@ function Download-Metadata-From-User {
 									# Write-Host "`n$temp_query"
 									$sqlScript += $temp_query + " "
 									
-									$TotalFiles++
+									# $TotalFiles++
 									# Write-Host "TotalFiles is $TotalFiles."
 									Write-Host "Added FileID $FileID to database." -ForegroundColor Green
 								}
@@ -399,16 +396,19 @@ function Download-Metadata-From-User {
 							Invoke-SqliteQuery -DataSource $DBFilePath -Query $sqlScript
 ######################################
 							$stopwatchCursor.Stop()
-							if ($CursorString -ne "") {
+							if ($CursorString.Trim() -ne "") {
 								Write-Host "Fetched metadata for cursor $Cursor (Rating: $Rating) for user $Username in $($stopwatchCursor.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 							} else {
 								Write-Host "Fetched metadata (Rating: $Rating) for user $Username in $($stopwatchCursor.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 							}
-							
+######################################
 							#update total files
+							$query = "SELECT COUNT(*) AS FileCount FROM Files WHERE username = '$Username'"
+							$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $query
+							$TotalFiles = $result.FileCount
 							$query = "UPDATE Users SET total_files = '$TotalFiles' WHERE username = '$Username'"
 							Invoke-SqliteQuery -DataSource $DBFilePath -Query $query
-							
+######################################
 							# if ($Response.metadata.nextCursor) {
 							#fixed fetching more pages when the skip limit is reached
 							#this happened because the break only stopped the foreach loop

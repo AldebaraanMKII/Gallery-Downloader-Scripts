@@ -18,6 +18,9 @@ $maxRetries = 5
 $initialDelay = 5000  # Initial delay in milliseconds
 $MaxDelay = 60000  # max delay in milliseconds
 ###############################
+#max parallel downloads. Not recommended to set this above the default unless you like to be rate limited.
+$MaxConcurrentDownloads = 3
+###############################
 # this is the amount of File skips that will abort the current query search. 
 $MaxSkipsBeforeAborting = 50
 # this is the number of Files that will be added at once to the database when processing metadata

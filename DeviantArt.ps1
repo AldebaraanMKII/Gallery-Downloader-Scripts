@@ -4,7 +4,7 @@ Import-Module PSSQLite
 # Import functions
 . "./(config) DeviantArt.ps1"
 . "./Functions.ps1"
-###############################
+########################################################
 function Download-Files-From-Database {
     param (
         [int]$Type
@@ -93,7 +93,7 @@ function Download-Files-From-Database {
 	} elseif ($Type -eq 2) {
 		$WhereQuery = $(Write-Host "`nEnter WHERE query:" -ForegroundColor cyan -NoNewLine; Read-Host) 
 		
-		$temp_query = "SELECT deviationID, src_url, extension, height, width, title, published_time, username FROM Files $WhereQuery;"
+		$temp_query = "SELECT username, deviationID, src_url, extension, height, width, title, published_time FROM Files $WhereQuery;"
 	
 		# Write-Host "temp_query: $temp_query" -ForegroundColor Yellow
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -110,7 +110,7 @@ function Download-Files-From-Database {
 }
 ######################################
 
-###############################
+########################################################
 # Function to download metadata
 function Download-Metadata-From-User {
     param (
@@ -118,18 +118,18 @@ function Download-Metadata-From-User {
         [string]$WordFilter,
         [string]$WordFilterExclude
     )
-######################################
+########################################################
 	# Set initial parameters for paging
 	$Cur_Offset = 0
 	
 	$ContinueFetching = $true
-########################################
+########################################################
 	
 ######### Add user if it doesn`t exist
 	$temp_query = "SELECT EXISTS(SELECT 1 from Users WHERE username = '$Username');"
 	$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 	$exists = $result."EXISTS(SELECT 1 from Users WHERE username = '$Username')"
-########################################
+########################################################
 	# Check the result
 	if ($exists -eq 0) {
 ################## Check and retrieve access token
@@ -143,7 +143,7 @@ function Download-Metadata-From-User {
 			$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
 			$Access_Token = $result[0].access_token
 		}
-##################
+########################################################
 		$URL = "https://www.deviantart.com/api/v1/oauth2/user/profile/$($Username)?ext_collections=1&ext_galleries=1&access_token=$Access_Token"
 		$URLConsole = "https://www.deviantart.com/api/v1/oauth2/user/profile/$($Username)?ext_collections=1&ext_galleries=1&access_token=access_token_here"
 		Write-Host "`nURL: $URLConsole" -ForegroundColor Yellow
@@ -155,7 +155,7 @@ function Download-Metadata-From-User {
 				# Make the API request and process the JSON response
 				$Response = Invoke-RestMethod -Uri $URL -Method Get
 				# $Response
-##################################
+########################################################
 				if ($Response.StatusCode -in 400, 404) {
 					Write-Output "User $username not found (400/404 error)" -ForegroundColor Red
 					$ContinueFetching = $false
@@ -168,7 +168,7 @@ function Download-Metadata-From-User {
 					
 					Write-Host "error 429/500 encountered. Retrying in $delay milliseconds..." -ForegroundColor Yellow
 					Start-Sleep -Milliseconds $delay
-##################################
+########################################################
 				} elseif ($Response -and $Response.user.username) {
 					Write-Host "User found" -ForegroundColor Green
 					
@@ -189,28 +189,28 @@ function Download-Metadata-From-User {
 					Write-Host "New user $Username added to database." -ForegroundColor Green
 					break
 				}
-##################################
+########################################################
 			} catch {
 				if ($Response.error_code -in 0, 1, 2) {
 					Write-Host "User $username not found. Skipping..." -ForegroundColor Red
 					$ContinueFetching = $false
 					break
-##################################
+########################################################
 				} elseif ($Response.error -eq "invalid_request") {
 					Write-Host "Invalid request: $($Response.error_description)" -ForegroundColor Red
 					$ContinueFetching = $false
 					break
-##################################
+########################################################
 				} else {
 					Write-Host "(Download-Metadata-From-User 1) An unexpected error occurred: $($Response.error_description)" -ForegroundColor Red
 					$ContinueFetching = $false
 					break
 				}
-##################################
+########################################################
 			}
-##################################
+########################################################
 		}
-##################################
+########################################################
 	} else {
 		Write-Host "`nFound user $Username in database." -ForegroundColor Green
 ################## Check and retrieve access token
@@ -224,33 +224,16 @@ function Download-Metadata-From-User {
 			$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
 			$Access_Token = $result[0].access_token
 		}
-##################
-		#load cur_offset and start search from there
-		$temp_query = "SELECT cur_offset FROM Users WHERE username = '$Username'"
-		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-		
-		# Write-Output "(Line 562) Raw result: $($result | Out-String)"
-		# Check the result
-		if ($result.Count -gt 0) {
-			if ($result[0].cur_offset -gt 0) {
-				$Cur_Offset = $result[0].cur_offset
-				Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
-			} else {
-				$Cur_Offset = 0
-			}
-		}
-##################
-###########################
-##########################################
+########################################################
 		#load last_time_fetched_metadata and start search from there
 		$temp_query = "SELECT last_time_fetched_metadata FROM Users WHERE username = '$Username'"
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-###########################
+########################################################
 		# Check the result
 		if ($result.Count -gt 0) {
 			if (-not [string]::IsNullOrWhiteSpace($result[0].last_time_fetched_metadata)) {
 				$DateLastDownloaded = $result[0].last_time_fetched_metadata
-###########################
+########################################################
 				# Ensure both dates are DateTime objects
 				$CurrentDate = [datetime]::ParseExact((Get-Date -Format "yyyy-MM-dd HH:mm:ss"), "yyyy-MM-dd HH:mm:ss", $null)
 				$DateLastDownloaded = [datetime]::ParseExact($DateLastDownloaded, "yyyy-MM-dd HH:mm:ss", $null)
@@ -258,11 +241,11 @@ function Download-Metadata-From-User {
 				$TimeDifference = $CurrentDate - $DateLastDownloaded
 				$HoursDifference = $TimeDifference.TotalHours
 	
-###########################
+########################################################
 				if ($HoursDifference -lt $TimeToCheckAgainMetadata) {
 					$ContinueFetching = $false
 					Write-Host "This user was updated less than $TimeToCheckAgainMetadata hours ago. Skipping..." -ForegroundColor Yellow
-###########################
+########################################################
 				}	else {
 					$URL = "https://www.deviantart.com/api/v1/oauth2/user/profile/$($Username)?ext_collections=1&ext_galleries=1&access_token=$Access_Token"
 					# Make the API request and process the JSON response
@@ -274,7 +257,7 @@ function Download-Metadata-From-User {
 							Write-Output "User $username not found (400/404 error)" -ForegroundColor Red
 							$ContinueFetching = $false
 							# break
-################################## too many requests, try again
+######################################################## too many requests, try again
 						} elseif ($Response.StatusCode -in 429, 500) {
 							$delay = Calculate-Delay -retryCount $retryCount
 							
@@ -288,30 +271,45 @@ function Download-Metadata-From-User {
 							#update total_user_deviations to current count
 							$temp_query = "UPDATE Users SET total_user_deviations = '$User_Deviations' WHERE username = '$Username'"
 							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-######################################################
+########################################################
+							#load cur_offset and start search from there
+							$temp_query = "SELECT cur_offset FROM Users WHERE username = '$Username'"
+							$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+							
+							# Write-Output "(Line 562) Raw result: $($result | Out-String)"
+							# Check the result
+							if ($result.Count -gt 0) {
+								if ($result[0].cur_offset -gt 0) {
+									$Cur_Offset = $result[0].cur_offset
+									Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
+								} else {
+									$Cur_Offset = 0
+								}
+							}
+########################################################
 							#update the last_time_fetched_metadata column to NULL
 							# $temp_query = "UPDATE Users SET last_time_fetched_metadata = NULL WHERE username = '$Username'"
 							# Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-######################################################
+########################################################
 						}
-######################################################
+########################################################
 					} catch {
 						Write-Host "(Download-Metadata-From-User 2) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
 						$ContinueFetching = $false
 					}
-###########################
+########################################################
 				}
-###########################
+########################################################
 			}
-##########################################
+########################################################
 		}
-##########################################
+########################################################
 	}
-############################################
+########################################################
 	$CurrentSkips = 0
 	if ($ContinueFetching) {
 		$HasMoreFiles = $true
-##########################################
+########################################################
 		# Loop through pages of images for the user
 		while ($HasMoreFiles) {
 			$retryCount = 0
@@ -321,7 +319,7 @@ function Download-Metadata-From-User {
 				} else {
 					Write-Host "`nFetching metadata for user $Username..." -ForegroundColor Yellow
 				}
-##########################################
+########################################################
 				try {
 					$AccessCodeExpired = Check-if-Access-Token-Expired
 					if ($AccessCodeExpired) {
@@ -342,18 +340,18 @@ function Download-Metadata-From-User {
 					# $Response = Invoke-RestMethod -Uri $URL -Method Get -Headers $headers
 					$Response = Invoke-RestMethod -Uri $URL -Method Get
 					# $response
-##########################################
+########################################################
 					# Check if there are any files returned in the response
 					if ($Response.results -and $Response.results.Count -gt 0) {
 						Write-Host "Number of results found: $($Response.results.Count)" -ForegroundColor Green
-##########################################
+########################################################
 						#files
 						$stopwatchCursor = [System.Diagnostics.Stopwatch]::StartNew()
 						$sqlScript = "BEGIN TRANSACTION; " 
 						foreach ($File in $Response.results) {
 							$DeviationID = $File.deviationid
 							$FileTitle = $File.title
-########################################## Skip locked content
+######################################################## Skip locked content
 							$Continue = $false
 							#tiers
 							#object exists in json response
@@ -370,7 +368,7 @@ function Download-Metadata-From-User {
 							} else {
 								$Continue = $true
 							}
-##########################################
+########################################################
 							if ($Continue) {
 								#premium folders
 								if ($File.PSObject.Properties['premium_folder_data']) {
@@ -386,9 +384,9 @@ function Download-Metadata-From-User {
 								} else {
 									$Continue = $true
 								}
-##########################################
+########################################################
 								if ($Continue) {
-########################################## Filter
+######################################################## Filter
 									$Continue = $false
 									# check title
 									$result = Check-WordFilter -Content $FileTitle -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
@@ -398,7 +396,7 @@ function Download-Metadata-From-User {
 									} else {
 										Write-Host "File $DeviationID ($FileTitle) failed the title word filter." -ForegroundColor Yellow
 									}
-########################################
+########################################################
 									if ($Continue) {
 										$temp_query = "SELECT EXISTS(SELECT 1 from Files WHERE deviationid = '$DeviationID');"
 										$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
@@ -418,7 +416,7 @@ function Download-Metadata-From-User {
 													break
 												}
 											}
-########################################
+########################################################
 										} else {
 											$FileUrlRaw = $File.url
 											# "https://www.deviantart.com/$($Username)/art/$($URL)"
@@ -436,7 +434,7 @@ function Download-Metadata-From-User {
 											$FilePublishedTime = [System.DateTime]::UnixEpoch.AddSeconds($FilePublishedTimeRaw).ToString("yyyy-MM-dd HH:mm:ss")
 											
 											# Write-Output "`nFileSrcURLRaw: $FileSrcURLRaw"
-########################################
+########################################################
 											#process images and videos differently
 											#images
 											if ($File.PSObject.Properties['content']) {
@@ -445,7 +443,7 @@ function Download-Metadata-From-User {
 												#remove this to save some database space
 												$FileSrcURL = $FileSrcURLRaw -replace "https://images-wixmp-", ""
 												
-######################################## Things from this point foward improve image quality
+######################################################## Things from this point foward improve image quality
 												$FileSrcURL = $FileSrcURL -replace ",q_\d{1,3}", ",q_100"	#any number between 1 and 3 digits is replaced with q_100
 												
 												#This will replace lower quality jpg/jpeg with png if available
@@ -460,7 +458,7 @@ function Download-Metadata-From-User {
 													$FileSrcURL = $FileSrcURL -replace [regex]::Escape($lastFileType), $firstFileType
 													# Write-Host "Updated string: $FileSrcURL" -ForegroundColor Green
 												}
-######################################## Image quality improvements end
+######################################################## Image quality improvements end
 												$temp_query = "INSERT INTO Files (deviationID, url, src_url, extension, height, width, title, username, published_time)
 																			VALUES ('$DeviationID', '$FileUrl', '$FileSrcURL', '$FileExtension', '$FileHeight', '$FileWidth', '$FileTitle', '$FileUsername', '$FilePublishedTime');"
 				
@@ -538,21 +536,21 @@ function Download-Metadata-From-User {
 											}
 				
 										}
-########################################
+########################################################
 									}
-########################################
+########################################################
 								}
 							}
-########################################
+########################################################
 						}
-################################################
+########################################################
 						# End the transaction
 						$sqlScript += "COMMIT;"  
 						#execute all queries at once
 						# Write-Host "`nExecuting queries..."
 						# Write-Host "`n sqlScript query from line 443 is $sqlScript"
 						Invoke-SqliteQuery -DataSource $DBFilePath -Query $sqlScript
-####################################
+########################################################
 						$stopwatchCursor.Stop()
 						if ($Cur_Offset -gt 0) {
 							Write-Host "Fetched metadata for offset $Cur_Offset for user $Username in $($stopwatchCursor.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
@@ -571,7 +569,7 @@ function Download-Metadata-From-User {
 								Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 								
 								Start-Sleep -Milliseconds $TimeToWait  # Waits for X seconds
-##########################################
+########################################################
 							}	else {
 								Write-Host "No more files found for user $UserName" -ForegroundColor Yellow
 								
@@ -612,6 +610,7 @@ function Download-Metadata-From-User {
 								$HasMoreFiles = $false
 								break       #stop fetching more data
 							}
+########################################################
 						#handle errors like skip limit reached
 						} else {
 							#update the Cur_Offset column so that next time the script is run it starts from the beginning
@@ -649,14 +648,14 @@ function Download-Metadata-From-User {
 							$HasMoreFiles = $false
 							break       #stop fetching more data
 						}
-##########################################
+########################################################
 					#this is to account for empty responses
 					} else {
 						Write-Host "No items found in response. Skipping user $UserName..." -ForegroundColor Red
 						$HasMoreFiles = $false
 						break
 					}
-##########################################
+########################################################
 				} catch {
 					if ($_.Exception.Response.StatusCode -in 429, 500) {
 						$delay = Calculate-Delay -retryCount $retryCount
@@ -670,7 +669,7 @@ function Download-Metadata-From-User {
 						Write-Host "Time to wait between requests increased to $TimeToWait." -ForegroundColor Yellow
 						
 						Start-Sleep -Milliseconds $delay
-################################
+########################################################
 					# 401 = Unauthorized
 					} elseif ($_.Exception.Response.StatusCode -eq 401) {
 						Write-Host "Access token invalid. Requesting a new one..." -ForegroundColor Yellow
@@ -680,24 +679,23 @@ function Download-Metadata-From-User {
 						Start-Sleep -Milliseconds $TimeToWait
 						# $HasMoreFiles = $false
 						# break
-################################
+########################################################
 					} else {
 						Write-Host "An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
 						$HasMoreFiles = $false
 						break
 					}
-################################
+########################################################
 				}
-##########################################
+########################################################
 			}
-##########################################
+########################################################
 		}
-############################################
-############################################
+########################################################
 	}
-############################################
+########################################################
 }
-############################################
+########################################################
 
 
 ############################################

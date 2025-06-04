@@ -36,6 +36,9 @@ $DownloadPromptMetadata = $false
 #time to wait between requests in milliseconds
 $TimeToWait = 3000
 ###############################
+#max parallel downloads. Not recommended to set this above the default unless you like to be rate limited.
+$MaxConcurrentDownloads = 4
+###############################
 #how many hours must pass after fetching metadata for a user's entire gallery before the script will check it again
 $TimeToCheckAgainMetadata = 336
 #how many hours must pass after downloading a user's entire gallery before the script will try to download any new files from them in the database

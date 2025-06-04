@@ -9,7 +9,6 @@ $DBFilePath = "./$DBFilename"
 #metadata fetch per request, minimum 1 maximum 24
 $Limit = 24
 ###############
-
 ## Please read https://www.deviantart.com/developers/authentication on how to obtain the $client_id and $client_secret
 ## make sure to use gallery-dl URI in your OAuth2 Redirect URI Whitelist in your app settings
 $client_id = ""
@@ -17,24 +16,26 @@ $client_secret = ""
 $redirect_uri = "https://mikf.github.io/gallery-dl/oauth-redirect.html"	#using gallery-dl URI
 $scope = "browse feed message note stash user user.manage comment.post collection"  # Or other scopes as required
 $state = ""  # Optional
-
+###############################
 # Here you can choose how the output file will be named
 # available options are: %Username%, %DeviationID%, %Height%, %Width%, %Title%, %PublishedTime% (format: yyyy-mm-dd HH-mm-ss), %PublishedTimeFormatted% (format: yyyy-mm-dd)
 #e.g. [Username1] (AAAAA-BBBBB-CCCCC-DDDDD) whatever-0001 (2024-08-24)
 $FilenameTemplate = "[%Username%] (%PublishedTimeFormatted%) %Title% (%DeviationID%)"
-
-###### http response error handling
+############################### http response error handling
 $maxRetries = 20
 $initialDelay = 30000  # Initial delay in milliseconds
 $MaxDelay = 60000  # max delay in milliseconds
-###############
+###############################
 # this is the amount of file skips that will abort the current user search. Set it to 0 to disable this.
 # $MaxSkipsBeforeAborting = $Limit * 2
 $MaxSkipsBeforeAborting = 10
-###############
+###############################
 #time to wait between requests in milliseconds. Recommended is 12000+ due to Wix being pieces of shit.
 $TimeToWait = 14000
-###############
+###############################
+#max parallel downloads. Not recommended to set this above the default unless you like to be rate limited.
+$MaxConcurrentDownloads = 3
+###############################
 #how many hours must pass after downloading a user's entire gallery before the script will check it again
 $TimeToCheckAgainMetadata = 336
 #how many hours must pass after downloading a user's entire gallery before the script will try to download any new files from them in the database

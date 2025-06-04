@@ -686,138 +686,286 @@ function Start-Download {
         [PSCustomObject[]]$FileList   #list of files to download
     )
 
-	$FileListForConversion = @()
-	$FilesRemaining = $FileList.Count
-	
-	Write-Host "Found $FilesRemaining files." -ForegroundColor Green
-				
-	$CurrentFileNumber = 0
-	foreach ($File in $FileList) {
-####################################################
-		#Rule34xxx/Gelbooru - ID
-		if ($SiteName -eq "Gelbooru_Based") {
-			$FileID, $FileDirectory, $FileHash, $FileExtension, $MainTag, $Filename  = Create-Filename -row $File -Type 1
-			$DownloadURL = "$($DownloadBaseURL)$($FileDirectory)/$($FileHash).$($FileExtension)"
-			$DownloadSubfolderIdentifier = "$MainTag"
-			$SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE id = '$FileID'"
-			$FileIdentifier = $FileID
-####################################################
-		#CivitAI - ID
-		} elseif ($SiteName -eq "CivitAI") {
-			# https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/filenamehere/width=1216/
-			# Write-Host "$($DownloadBaseURL)$($FileURL)$($FileFilename)/width=$FileWidth"
-			
-			$FileID, $Filename, $FileExtension, $FileURL, $FileFilename, $FileWidth, $Username  = Create-Filename -row $File -Type 2
-			$DownloadURL = "$($DownloadBaseURL)$($FileURL)$($FileFilename)/width=$FileWidth"
-			$DownloadSubfolderIdentifier = "$Username"
-			$SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE id = '$FileID'"
-			$FileIdentifier = $FileID
-####################################################
-		#Kemono - SHA256
-		} elseif ($SiteName -eq "Kemono") {
-			$FileHash, $FileExtension, $FileURL, $FileFilenameExtension, $CreatorName, $Filename  = Create-Filename -row $File -Type 3
-			$DownloadURL = "$($DownloadBaseURL)$($FileURL)/$($FileHash).$($FileExtension)"
-			$DownloadSubfolderIdentifier = "$CreatorName"
-			$SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE hash = '$FileHash'"
-			$FileIdentifier = $FileHash
-####################################################
-		#DeviantArt - DeviantionID
-		} elseif ($SiteName -eq "DeviantArt") {
-			$FileDeviationID, $FileExtension, $FileSrcURL, $FileTitle, $Username, $Filename = Create-Filename -row $File -Type 4
-			
-			#video
-			if ($FileExtension -in @(".mp4", ".mkv", ".webm", ".av1")) {
-				$DownloadURL = "https://wixmp-$($FileSrcURL)"
-			#image
-			} else {
-				$DownloadURL = "https://images-wixmp-$($FileSrcURL)"
-			}
-			
-			$DownloadSubfolderIdentifier = "$Username"
-			$SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE deviationID = '$FileDeviationID'"
-			$FileIdentifier = $FileDeviationID
-		}
-####################################################
-		# Replace invalid characters with an empty string
-		$Filename = $Filename -replace "[$invalidChars]", ''
-		
-		# Define the download path
-		$DownloadSubFolder = Join-Path $DownloadFolder "$DownloadSubfolderIdentifier"
-		$FilePath = Join-Path $DownloadSubFolder "$Filename.$FileExtension"
-		
-		# Ensure download folder exists
-		if (-not (Test-Path $DownloadSubFolder)) {
-			New-Item -ItemType Directory -Path $DownloadSubFolder | Out-Null
-		}
-	
-		# download logic
-		if (-not (Test-Path $FilePath)) {
-			# No existing file found, download the file
-			
-			$retryCount = 0
-			while ($retryCount -lt $maxRetries) {
-				try {
-					Invoke-WebRequest -Uri $DownloadURL -OutFile $FilePath
-					
-					#update the downloaded column
-					$temp_query = $SetFileDownloadedQuery
-					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-					
-					$CurrentFileNumber++
-					$FilesRemaining = $FilesRemaining - 1
-					# Create a custom object for the file
-					$fileObject = [PSCustomObject]@{
-						FilePath      = $FilePath
-						Filename      = $Filename
-						FileExtension = $FileExtension
-					}
-					
-					# Add the custom object to the array
-					$FileListForConversion += $fileObject
-					
-					Write-Host "($CurrentFileNumber of $($result.Count)) Downloaded file $Filename.$FileExtension" -ForegroundColor Green
-####################################################
-					break #stop while for retries
-####################################################
-				} catch [System.IO.IOException] {
-					$BreakLoop = $false
-					$retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $_.Exception.Message -StatusCode 0 -Site $SiteName -Type 1 -FileIdentifier $FileIdentifier -Username $Username
-					
-					if ($BreakLoop) {
-						break
-					}
-####################################################
-				} catch {
-					$BreakLoop = $false
-					$retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage "" -StatusCode $_.Exception.Response.StatusCode -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
-					
-					if ($BreakLoop) {
-						break
-					}
-####################################################
-				}
-####################################################
-			}
-####################################################
-		} else {
-			$CurrentFileNumber++
-			$FilesRemaining = $FilesRemaining - 1
-			Write-Host "File name $Filename already exists in download directory, skipping..." -ForegroundColor Yellow
-			
-			#update the downloaded column
-			$temp_query = $SetFileDownloadedQuery
-			Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-		}
-####################################################
-		# Write-Host "$FilesRemaining"
-		if ($ConvertFiles) {
-			if ($FileListForConversion.Count -ge $ConvertFilesAmount -or $FilesRemaining -le 0) {
-				Convert-File -FileList $FileListForConversion -Folder $DownloadSubFolder
-				$FileListForConversion = @()
-			}
-		}
-####################################################
-	}
-####################################################
+    $FileListForConversion = [System.Collections.ArrayList]::Synchronized([System.Collections.ArrayList]::new())
+    $FilesRemaining = $FileList.Count
+    $CompletedFiles = 0
+    
+    Write-Host "Found $FilesRemaining files." -ForegroundColor Green
+    
+    # Create runspace pool for concurrent downloads
+    $RunspacePool = [runspacefactory]::CreateRunspacePool(1, $MaxConcurrentDownloads)
+    $RunspacePool.Open()
+#########################################################
+    # Script block for each download task
+    $DownloadScriptBlock = {
+        param(
+            $File,
+            $SiteName,
+            $DownloadBaseURL,
+            $DownloadFolder,
+            $invalidChars,
+            $maxRetries,
+            $DBFilePath,
+            $CreateFilenameFunction,
+            $HandleErrorsFunction,
+            $InvokeSqliteQueryFunction,
+            $FileIndex,
+            $TotalFiles,
+            $FilenameTemplate,
+            $PostID,
+            $PostTitle,
+            $PostDatePublishedFormatted,
+            $PostDatePublishedFormattedShort,
+            $PostTotalFiles
+        )
+        
+        # Define functions in the runspace
+        $CreateFilenameScriptBlock = [ScriptBlock]::Create("function Create-Filename { $CreateFilenameFunction }")
+        $HandleErrorsScriptBlock = [ScriptBlock]::Create("function Handle-Errors { $HandleErrorsFunction }")
+        $InvokeSqliteQueryScriptBlock = [ScriptBlock]::Create("function Invoke-SqliteQuery { $InvokeSqliteQueryFunction }")
+        
+        # Execute the function definitions
+        . $CreateFilenameScriptBlock
+        . $HandleErrorsScriptBlock  
+        . $InvokeSqliteQueryScriptBlock
+#########################################################
+        try {
+            # Process file based on site type
+            switch ($SiteName) {
+                "Gelbooru_Based" {
+                    $FileID, $FileDirectory, $FileHash, $FileExtension, $MainTag, $Filename = Create-Filename -row $File -Type 1
+                    $DownloadURL = "$($DownloadBaseURL)$($FileDirectory)/$($FileHash).$($FileExtension)"
+                    $DownloadSubfolderIdentifier = "$MainTag"
+                    $SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE id = '$FileID'"
+                    $FileIdentifier = $FileID
+                    $Username = ""
+                }
+                "CivitAI" {
+                    $FileID, $Filename, $FileExtension, $FileURL, $FileFilename, $FileWidth, $Username = Create-Filename -row $File -Type 2
+                    $DownloadURL = "$($DownloadBaseURL)$($FileURL)$($FileFilename)/width=$FileWidth"
+                    $DownloadSubfolderIdentifier = "$Username"
+                    $SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE id = '$FileID'"
+                    $FileIdentifier = $FileID
+                }
+                "Kemono" {
+                    $FileHash, $FileExtension, $FileURL, $FileFilenameExtension, $CreatorName, $Filename = Create-Filename -row $File -Type 3
+                    $DownloadURL = "$($DownloadBaseURL)$($FileURL)/$($FileHash).$($FileExtension)"
+                    $DownloadSubfolderIdentifier = "$CreatorName"
+                    $SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE hash = '$FileHash'"
+                    $FileIdentifier = $FileHash
+                    $Username = $CreatorName
+                }
+                "DeviantArt" {
+                    $FileDeviationID, $FileExtension, $FileSrcURL, $FileTitle, $Username, $Filename = Create-Filename -row $File -Type 4
+                    
+                    if ($FileExtension -in @(".mp4", ".mkv", ".webm", ".av1")) {
+                        $DownloadURL = "https://wixmp-$($FileSrcURL)"
+                    } else {
+                        $DownloadURL = "https://images-wixmp-$($FileSrcURL)"
+                    }
+                    
+                    $DownloadSubfolderIdentifier = "$Username"
+                    $SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE deviationID = '$FileDeviationID'"
+                    $FileIdentifier = $FileDeviationID
+                }
+            }
+#########################################################
+            # Clean filename
+            $Filename = $Filename -replace "[$invalidChars]", ''
+            
+            # Define download path
+            $DownloadSubFolder = Join-Path $DownloadFolder "$DownloadSubfolderIdentifier"
+            $FilePath = Join-Path $DownloadSubFolder "$Filename.$FileExtension"
+            
+            # Ensure download folder exists
+            if (-not (Test-Path $DownloadSubFolder)) {
+                $null = New-Item -ItemType Directory -Path $DownloadSubFolder -Force
+            }
+            
+            $result = @{
+                Success = $false
+                FilePath = $FilePath
+                Filename = $Filename
+                FileExtension = $FileExtension
+                Message = ""
+                FileIndex = $FileIndex
+                AlreadyExists = $false
+            }
+#########################################################
+            # Download logic
+            if (-not (Test-Path $FilePath)) {
+                $retryCount = 0
+                $downloadSuccessful = $false
+                
+                while ($retryCount -lt $maxRetries -and -not $downloadSuccessful) {
+                    try {
+                        # Use WebClient for download
+                        $webClient = [System.Net.WebClient]::new()
+                        $webClient.DownloadFile($DownloadURL, $FilePath)
+                        $webClient.Dispose()
+                        
+                        # Update database
+                        Invoke-SqliteQuery -DataSource $DBFilePath -Query $SetFileDownloadedQuery
+                        
+                        $result.Success = $true
+                        $result.Message = "Downloaded successfully"
+                        $downloadSuccessful = $true
+                        
+                    } catch [System.IO.IOException] {
+                        $BreakLoop = $false
+                        $retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $_.Exception.Message -StatusCode 0 -Site $SiteName -Type 1 -FileIdentifier $FileIdentifier -Username $Username
+                        
+                        if ($BreakLoop) {
+                            $result.Message = "IO Error - giving up after retries"
+                            break
+                        }
+                    } catch {
+                        $BreakLoop = $false
+                        $StatusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode } else { 0 }
+                        $retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $_.Exception.Message -StatusCode $StatusCode -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
+                        
+                        if ($BreakLoop) {
+                            $result.Message = "Download error - giving up after retries: $($_.Exception.Message)"
+                            break
+                        }
+                    }
+                }
+                
+                if (-not $downloadSuccessful) {
+                    $result.Message = "Failed after $maxRetries retries"
+                }
+                
+            } else {
+                # File already exists
+                Invoke-SqliteQuery -DataSource $DBFilePath -Query $SetFileDownloadedQuery
+                $result.Success = $true
+                $result.AlreadyExists = $true
+                $result.Message = "File already exists"
+            }
+            
+            return $result
+#########################################################
+        } catch {
+            return @{
+                Success = $false
+                FilePath = ""
+                Filename = $Filename
+                FileExtension = $FileExtension
+                Message = "Error processing file: $($_.Exception.Message)"
+                FileIndex = $FileIndex
+                AlreadyExists = $false
+            }
+        }
+    }
+    
+    # Get function definitions as strings to pass to runspaces
+    $CreateFilenameFunction = Get-Command Create-Filename | Select-Object -ExpandProperty Definition
+    $HandleErrorsFunction = Get-Command Handle-Errors | Select-Object -ExpandProperty Definition  
+    $InvokeSqliteQueryFunction = Get-Command Invoke-SqliteQuery | Select-Object -ExpandProperty Definition
+    
+    # Create jobs for each file
+    $Jobs = @()
+    $FileIndex = 0
+#########################################################
+    foreach ($File in $FileList) {
+        $FileIndex++
+        
+        # Create PowerShell instance
+        $PowerShell = [powershell]::Create()
+        $PowerShell.RunspacePool = $RunspacePool
+        
+        # Add script and parameters
+        [void]$PowerShell.AddScript($DownloadScriptBlock)
+        [void]$PowerShell.AddArgument($File)
+        [void]$PowerShell.AddArgument($SiteName)
+        [void]$PowerShell.AddArgument($DownloadBaseURL)
+        [void]$PowerShell.AddArgument($DownloadFolder)
+        [void]$PowerShell.AddArgument($invalidChars)
+        [void]$PowerShell.AddArgument($maxRetries)
+        [void]$PowerShell.AddArgument($DBFilePath)
+        [void]$PowerShell.AddArgument($CreateFilenameFunction)
+        [void]$PowerShell.AddArgument($HandleErrorsFunction)
+        [void]$PowerShell.AddArgument($InvokeSqliteQueryFunction)
+        [void]$PowerShell.AddArgument($FileIndex)
+        [void]$PowerShell.AddArgument($FilesRemaining)
+        [void]$PowerShell.AddArgument($FilenameTemplate)
+        [void]$PowerShell.AddArgument($PostID)
+        [void]$PowerShell.AddArgument($PostTitle)
+        [void]$PowerShell.AddArgument($PostDatePublishedFormatted)
+        [void]$PowerShell.AddArgument($PostDatePublishedFormattedShort)
+        [void]$PowerShell.AddArgument($PostTotalFiles)
+        
+        # Start the job
+        $AsyncResult = $PowerShell.BeginInvoke()
+        
+        $Jobs += [PSCustomObject]@{
+            PowerShell = $PowerShell
+            AsyncResult = $AsyncResult
+            FileIndex = $FileIndex
+        }
+    }
+#########################################################
+    # Wait for jobs to complete and collect results
+    $CompletedJobs = 0
+    $FilesForConversion = @()
+    
+    while ($CompletedJobs -lt $Jobs.Count) {
+        foreach ($Job in $Jobs) {
+            if ($Job.AsyncResult.IsCompleted -and $Job.PowerShell) {
+                try {
+                    $Result = $Job.PowerShell.EndInvoke($Job.AsyncResult)
+                    
+                    if ($Result.Success) {
+                        if ($Result.AlreadyExists) {
+                            Write-Host "($($Job.FileIndex) of $FilesRemaining) File $($Result.Filename) already exists, skipping..." -ForegroundColor Yellow
+                        } else {
+                            Write-Host "($($Job.FileIndex) of $FilesRemaining) Downloaded file $($Result.Filename).$($Result.FileExtension)" -ForegroundColor Green
+                            
+                            # Add to conversion list
+                            $fileObject = [PSCustomObject]@{
+                                FilePath      = $Result.FilePath
+                                Filename      = $Result.Filename
+                                FileExtension = $Result.FileExtension
+                            }
+                            $FilesForConversion += $fileObject
+                        }
+                    } else {
+                        Write-Host "($($Job.FileIndex) of $FilesRemaining) Failed: $($Result.Filename) - $($Result.Message)" -ForegroundColor Red
+                    }
+                    
+                } catch {
+                    Write-Host "Error retrieving job result: $($_.Exception.Message)" -ForegroundColor Red
+                } finally {
+                    # Clean up
+                    $Job.PowerShell.Dispose()
+                    $Job.PowerShell = $null
+                    $CompletedJobs++
+                }
+            }
+        }
+        
+        # Small delay to prevent busy waiting
+        Start-Sleep -Milliseconds 100
+    }
+    
+    # Clean up runspace pool
+    $RunspacePool.Close()
+    $RunspacePool.Dispose()
+#########################################################
+    # Handle file conversion if needed
+    if ($ConvertFiles -and $FilesForConversion.Count -gt 0) {
+        # Group files by subfolder for conversion
+        $FileGroups = $FilesForConversion | Group-Object { Split-Path (Split-Path $_.FilePath -Parent) -Leaf }
+        
+        foreach ($group in $FileGroups) {
+            $SubfolderPath = Join-Path $DownloadFolder $group.Name
+            Convert-File -FileList $group.Group -Folder $SubfolderPath
+        }
+    }
+#########################################################
+    Write-Host "All downloads completed!" -ForegroundColor Green
 }
-####################################################
+#########################################################
+
+
+
