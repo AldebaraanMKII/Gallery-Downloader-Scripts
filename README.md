@@ -4,6 +4,7 @@ A collection of PowerShell scripts to download images/videos from various websit
 
 ## Features
 
+- Concurrent downloads
 - Download metadata from the API of supported sites
 - Store metadata efficiently in a SQLite database to minimize size
 - Download images/videos using the database without contacting the API again
