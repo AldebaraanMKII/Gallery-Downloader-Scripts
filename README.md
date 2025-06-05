@@ -94,5 +94,4 @@ The files will be added if they have a pattern in their filename:
 
 
 ### TODO list
-- Add concurrent downloads
 - Add CivitAI tag filter
