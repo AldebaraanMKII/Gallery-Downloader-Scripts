@@ -684,6 +684,7 @@ function Start-Download {
     param (
         [string]$SiteName,  # Site name (e.g., "Gelbooru", "CivitAI", etc.)
         [PSCustomObject[]]$FileList   #list of files to download
+        # [int]$MaxConcurrentDownloads = 4  # Number of concurrent downloads
     )
 
     $FileListForConversion = [System.Collections.ArrayList]::Synchronized([System.Collections.ArrayList]::new())
@@ -695,7 +696,7 @@ function Start-Download {
     # Create runspace pool for concurrent downloads
     $RunspacePool = [runspacefactory]::CreateRunspacePool(1, $MaxConcurrentDownloads)
     $RunspacePool.Open()
-#########################################################
+    
     # Script block for each download task
     $DownloadScriptBlock = {
         param(
@@ -728,7 +729,7 @@ function Start-Download {
         . $CreateFilenameScriptBlock
         . $HandleErrorsScriptBlock  
         . $InvokeSqliteQueryScriptBlock
-#########################################################
+        
         try {
             # Process file based on site type
             switch ($SiteName) {
@@ -769,7 +770,7 @@ function Start-Download {
                     $FileIdentifier = $FileDeviationID
                 }
             }
-#########################################################
+            
             # Clean filename
             $Filename = $Filename -replace "[$invalidChars]", ''
             
@@ -791,7 +792,7 @@ function Start-Download {
                 FileIndex = $FileIndex
                 AlreadyExists = $false
             }
-#########################################################
+            
             # Download logic
             if (-not (Test-Path $FilePath)) {
                 $retryCount = 0
@@ -810,31 +811,27 @@ function Start-Download {
                         $result.Success = $true
                         $result.Message = "Downloaded successfully"
                         $downloadSuccessful = $true
-                        
+####################################################
                     } catch [System.IO.IOException] {
-                        $BreakLoop = $false
-                        $retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $_.Exception.Message -StatusCode 0 -Site $SiteName -Type 1 -FileIdentifier $FileIdentifier -Username $Username
-                        
-                        if ($BreakLoop) {
-                            $result.Message = "IO Error - giving up after retries"
-                            break
-                        }
-                    } catch {
-                        $BreakLoop = $false
-                        $StatusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode } else { 0 }
-                        $retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $_.Exception.Message -StatusCode $StatusCode -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
-                        
-                        if ($BreakLoop) {
-                            $result.Message = "Download error - giving up after retries: $($_.Exception.Message)"
-                            break
-                        }
-                    }
+						$BreakLoop = $false
+						Write-Host "Error message: $_.Exception.Message" -ForegroundColor Red
+						$retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $_.Exception.Message -StatusCode 0 -Site $SiteName -Type 1 -FileIdentifier $FileIdentifier -Username $Username
+						
+						if ($BreakLoop) {
+							break
+						}
+####################################################
+					} catch {
+						$BreakLoop = $false
+						Write-Host "Error message: $_.Exception.Response.StatusCode" -ForegroundColor Red
+						$retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage "" -StatusCode $_.Exception.Response.StatusCode -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
+						
+						if ($BreakLoop) {
+							break
+						}
+					}
+####################################################
                 }
-                
-                if (-not $downloadSuccessful) {
-                    $result.Message = "Failed after $maxRetries retries"
-                }
-                
             } else {
                 # File already exists
                 Invoke-SqliteQuery -DataSource $DBFilePath -Query $SetFileDownloadedQuery
@@ -844,7 +841,7 @@ function Start-Download {
             }
             
             return $result
-#########################################################
+            
         } catch {
             return @{
                 Success = $false
@@ -866,7 +863,7 @@ function Start-Download {
     # Create jobs for each file
     $Jobs = @()
     $FileIndex = 0
-#########################################################
+    
     foreach ($File in $FileList) {
         $FileIndex++
         
@@ -904,7 +901,7 @@ function Start-Download {
             FileIndex = $FileIndex
         }
     }
-#########################################################
+    
     # Wait for jobs to complete and collect results
     $CompletedJobs = 0
     $FilesForConversion = @()
@@ -951,7 +948,7 @@ function Start-Download {
     # Clean up runspace pool
     $RunspacePool.Close()
     $RunspacePool.Dispose()
-#########################################################
+    
     # Handle file conversion if needed
     if ($ConvertFiles -and $FilesForConversion.Count -gt 0) {
         # Group files by subfolder for conversion
@@ -962,10 +959,9 @@ function Start-Download {
             Convert-File -FileList $group.Group -Folder $SubfolderPath
         }
     }
-#########################################################
+    
     Write-Host "All downloads completed!" -ForegroundColor Green
 }
-#########################################################
-
+###############################################
 
 

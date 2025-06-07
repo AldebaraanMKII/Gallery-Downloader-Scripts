@@ -73,17 +73,17 @@ function Download-Files-From-Database {
 							$PostTitle = $Post.title
 							# $PostDatePublished = $Post.date_published
 							
-							# Check if is null or empty
+######################################### Check if is null or empty
 							if ($Post.date_published) 
 							{ 
 								$PostDatePublished = $Post.date_published 
 								$PostDatePublishedFormatted = [datetime]::ParseExact($PostDatePublished, "yyyy-MM-dd HH:mm:ss", $null).ToString("yyyy-MM-dd HH-mm-ss")
 								$PostDatePublishedFormattedShort = [datetime]::ParseExact($PostDatePublished, "yyyy-MM-dd HH:mm:ss", $null).ToString("yyyy-MM-dd")
 							} else { 
-								$PostDatePublishedFormatted = "Null" 
-								$PostDatePublishedFormattedShort = "Null" 
+								$PostDatePublishedFormatted = "Unknown" 
+								$PostDatePublishedFormattedShort = "Unknown" 
 							}
-							
+#########################################
 							$PostTotalFiles = $Post.total_files
 							
 							# Replace invalid characters with an empty string
@@ -333,6 +333,11 @@ function Download-Metadata-From-Creator {
 									$PostTitle = $PostTitle -replace "'", "''"
 									$PostContent = $PostContent -replace "'", "''"
 									
+									if ($PostContentSkip) 
+									{
+										$PostContent = ""
+									}
+									
 									# $PostDateAdded = $Post.added
 									# $PostDatePublished = $Post.published
 									
@@ -340,10 +345,10 @@ function Download-Metadata-From-Creator {
 									if ($Post.added) 
 									{ 
 										$PostDateAdded = $Post.added 
-										$PostDateAdded = $PostDateAdded -replace 'T', ' ' -replace '\.\d+', ''									
+										$PostDateAdded = $PostDateAdded -replace 'T', ' ' -replace '\.\d+', ''
 										$PostDateAddedFormatted = [datetime]::ParseExact($PostDateAdded, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
 									} else { 
-										$PostDateAddedFormatted = "Null" 
+										$PostDateAddedFormatted = "" 
 									}
 									
 									if ($Post.published) 
@@ -352,7 +357,7 @@ function Download-Metadata-From-Creator {
 										$PostDatePublished = $PostDatePublished -replace 'T', ' ' -replace '\.\d+', ''
 										$PostDatePublishedFormatted = [datetime]::ParseExact($PostDatePublished, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
 									} else { 
-										$PostDatePublishedFormatted = "Null" 
+										$PostDatePublishedFormatted = "" 
 									}
 
 									# "added": "2024-08-27T17:26:54.105855",

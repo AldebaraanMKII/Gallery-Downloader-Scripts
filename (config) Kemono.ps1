@@ -27,6 +27,9 @@ $MaxSkipsBeforeAborting = 10
 # if set to true, the word filter will also include/exclude posts that contain words in the content body
 $FilterPostContent = $false
 ###############################
+# if set to true, skip adding post content to the database. This can save space on database.
+$PostContentSkip = $false
+###############################
 # if set to true, a subfolder will be created for each post ([postID] postTitle), otherwise all files will be under the service/creator [creatorID] folder
 $CreateSubfolderForPosts = $false
 ###############################
