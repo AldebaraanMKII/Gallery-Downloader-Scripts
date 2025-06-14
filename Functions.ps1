@@ -665,11 +665,21 @@ function Start-Download {
     
     Write-Host "Found $FilesRemaining files." -ForegroundColor Green
     
+    # Create cancellation token source for graceful shutdown
+    $CancellationTokenSource = [System.Threading.CancellationTokenSource]::new()
+    
+    # Register CTRL+C handler
+    $null = Register-ObjectEvent -InputObject ([Console]) -EventName CancelKeyPress -Action {
+        Write-Host "`nCancellation requested. Stopping downloads..." -ForegroundColor Yellow
+        $Event.MessageData.CancellationTokenSource.Cancel()
+        $Event.MessageData.ShouldStop = $true
+    } -MessageData @{ CancellationTokenSource = $CancellationTokenSource; ShouldStop = $false }
+    
     # Create runspace pool for concurrent downloads
     $RunspacePool = [runspacefactory]::CreateRunspacePool(1, $MaxConcurrentDownloads)
     $RunspacePool.Open()
     
-    # Script block for each download task
+    # Script block for each download task (simplified and optimized)
     $DownloadScriptBlock = {
         param(
             $File,
@@ -689,10 +699,25 @@ function Start-Download {
             $PostTitle,
             $PostDatePublishedFormatted,
             $PostDatePublishedFormattedShort,
-            $PostTotalFiles
+            $PostTotalFiles,
+            $CancellationToken
         )
         
-        # Define functions in the runspace
+        # Check for cancellation at the start
+        if ($CancellationToken.IsCancellationRequested) {
+            return @{
+                Success = $false
+                FilePath = ""
+                Filename = "Cancelled"
+                FileExtension = ""
+                Message = "Download cancelled"
+                FileIndex = $FileIndex
+                AlreadyExists = $false
+                Cancelled = $true
+            }
+        }
+        
+        # Define functions in the runspace (only the definitions, not the full function objects)
         $CreateFilenameScriptBlock = [ScriptBlock]::Create("function Create-Filename { $CreateFilenameFunction }")
         $HandleErrorsScriptBlock = [ScriptBlock]::Create("function Handle-Errors { $HandleErrorsFunction }")
         $InvokeSqliteQueryScriptBlock = [ScriptBlock]::Create("function Invoke-SqliteQuery { $InvokeSqliteQueryFunction }")
@@ -763,209 +788,239 @@ function Start-Download {
                 Message = ""
                 FileIndex = $FileIndex
                 AlreadyExists = $false
+                Cancelled = $false
             }
             
-			# Download logic
-			if (-not (Test-Path $FilePath)) {
-				$retryCount = 0
-				$downloadSuccessful = $false
-				$handledError = $false  # Add this flag to track handled errors
-				$handledErrorMessage = ""  # Store the specific handled error message
-				
-				while ($retryCount -lt $maxRetries -and -not $downloadSuccessful -and -not $handledError) {
-					try {
-						# Create HttpWebRequest for better error handling
-						$request = [System.Net.HttpWebRequest]::Create($DownloadURL)
-						$request.Method = "GET"
-						$request.Timeout = 30000  # 30 seconds timeout
-						$request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-						
-						# Get response
-						$response = $request.GetResponse()
-						$httpResponse = $response -as [System.Net.HttpWebResponse]
-						
-						$responseStream = $response.GetResponseStream()
-						
-						# Create file stream
-						$fileStream = [System.IO.File]::Create($FilePath)
-						
-						# Copy data
-						$responseStream.CopyTo($fileStream)
-						
-						# Get actual file size
-						$fileSize = $fileStream.Length
-						
-						# Clean up streams
-						$fileStream.Close()
-						$responseStream.Close()
-						$response.Close()
-						
-						# Check if file is actually valid (not empty or error page)
-						if ($fileSize -eq 0) {
-							# $host.UI.WriteLine("DEBUG: File is empty, treating as error")
-							Remove-Item $FilePath -Force
-							throw [System.Exception]::new("Downloaded file is empty")
-						}
-						
-						# Update database
-						Invoke-SqliteQuery -DataSource $DBFilePath -Query $SetFileDownloadedQuery
-						
-						$result.Success = $true
-						$result.Message = "Downloaded successfully"
-						$downloadSuccessful = $true
-												
-					} catch [System.Net.WebException] {
-						$BreakLoop = $false
-						$ErrorMessage = $_.Exception.Message
-						$StatusCode = 0
-												
-						# Get HTTP status code from WebException
-						if ($_.Exception.Response) {
-							$httpResponse = $_.Exception.Response -as [System.Net.HttpWebResponse]
-							if ($httpResponse) {
-								$StatusCode = [int]$httpResponse.StatusCode
-								$StatusDescription = $httpResponse.StatusDescription
-								# $host.UI.WriteLine("DEBUG: HTTP Status from Exception = $StatusCode $StatusDescription")
-								$host.UI.WriteLine("HTTP $StatusCode $StatusDescription`: $ErrorMessage")
-								
-								# Close the error response
-								$httpResponse.Close()
-							}
-						} else {
-							# $host.UI.WriteLine("DEBUG: No response object in WebException")
-							$host.UI.WriteLine("Network Error: $ErrorMessage")
-						}
-						
-						# Clean up any partial file
-						if (Test-Path $FilePath) {
-							# $host.UI.WriteLine("DEBUG: Cleaning up partial file")
-							try { Remove-Item $FilePath -Force } catch { }
-						}
-						
-						$retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $ErrorMessage -StatusCode $StatusCode -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
-						
-						if ($BreakLoop) {
-							$handledError = $true
-							if ($StatusCode -eq 404) {
-								$handledErrorMessage = "File was deleted (404 error) - marked as deleted in database"
-							} elseif ($StatusCode -eq 401) {
-								$handledErrorMessage = "File is locked/private (401 error) - marked as downloaded in database"
-							} else {
-								$handledErrorMessage = "HTTP Error $StatusCode`: $ErrorMessage"
-							}
-							break
-						}
-						
-					} catch [System.IO.IOException] {
-						$BreakLoop = $false
-						$ErrorMessage = $_.Exception.Message
-						Write-Host "IO Error: $ErrorMessage" -ForegroundColor Red
-						
-						# Clean up any partial file
-						if (Test-Path $FilePath) {
-							try { Remove-Item $FilePath -Force } catch { }
-						}
-						
-						$retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $ErrorMessage -StatusCode 0 -Site $SiteName -Type 1 -FileIdentifier $FileIdentifier -Username $Username
-						
-						if ($BreakLoop) {
-							$handledError = $true
-							$handledErrorMessage = "IO Error: $ErrorMessage"
-							break
-						}
-						
-					} catch [System.UnauthorizedAccessException] {
-						$BreakLoop = $false
-						$ErrorMessage = $_.Exception.Message
-						Write-Host "Access Error: $ErrorMessage" -ForegroundColor Red
-						
-						$retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $ErrorMessage -StatusCode 403 -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
-						
-						if ($BreakLoop) {
-							$handledError = $true
-							$handledErrorMessage = "Access Error: $ErrorMessage"
-							break
-						}
-						
-					} catch {
-						$BreakLoop = $false
-						$StatusCode = 0
-						$ErrorMessage = $_.Exception.Message
-						
-						# Clean up any partial file
-						if (Test-Path $FilePath) {
-							try { Remove-Item $FilePath -Force } catch { }
-						}
-						
-						# Check if this is actually a WebException that wasn't caught above
-						if ($_.Exception -is [System.Net.WebException]) {
-							$webEx = $_.Exception -as [System.Net.WebException]
-							if ($webEx.Response) {
-								$httpResponse = $webEx.Response -as [System.Net.HttpWebResponse]
-								if ($httpResponse) {
-									$StatusCode = [int]$httpResponse.StatusCode
-									$httpResponse.Close()
-								}
-							}
-						}
-						
-						# Try to extract status code from error message patterns
-						if ($StatusCode -eq 0) {
-							if ($ErrorMessage -match "404|Not Found") {
-								$StatusCode = 404
-							} elseif ($ErrorMessage -match "403|Forbidden|Unauthorized") {
-								$StatusCode = 403
-							} elseif ($ErrorMessage -match "500|Internal Server Error") {
-								$StatusCode = 500
-							} elseif ($ErrorMessage -match "429|Too Many Requests") {
-								$StatusCode = 429
-							} elseif ($ErrorMessage -match "502|Bad Gateway") {
-								$StatusCode = 502
-							} elseif ($ErrorMessage -match "503|Service Unavailable") {
-								$StatusCode = 503
-							}
-						}
-						
-						Write-Host "General Error (Status: $StatusCode): $ErrorMessage" -ForegroundColor Red
-						
-						$retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $ErrorMessage -StatusCode $StatusCode -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
-						
-						if ($BreakLoop) {
-							$handledError = $true
-							if ($StatusCode -eq 404) {
-								$handledErrorMessage = "File was deleted (404 error) - marked as deleted in database"
-							} elseif ($StatusCode -eq 401) {
-								$handledErrorMessage = "File is locked/private (401 error) - marked as downloaded in database"
-							} else {
-								$handledErrorMessage = "General Error (Status: $StatusCode): $ErrorMessage"
-							}
-							break
-						}
-					}
-					
-					# Add delay between retries
-					if ($retryCount -lt $maxRetries -and -not $downloadSuccessful -and -not $handledError) {
-						Start-Sleep -Seconds ([Math]::Min(2 * $retryCount, 10))  # Exponential backoff, max 10 seconds
-					}
-				}
-				
-				# Set the appropriate result message
-				if ($downloadSuccessful) {
-					# Already set above
-				} elseif ($handledError) {
-					$result.Message = $handledErrorMessage
-				} else {
-					# If we exhausted all retries without success and no handled error
-					$result.Message = "Failed after $maxRetries attempts"
-				}
-				
-			} else {
-				# File already exists
-				Invoke-SqliteQuery -DataSource $DBFilePath -Query $SetFileDownloadedQuery
-				$result.Success = $true
-				$result.AlreadyExists = $true
-				$result.Message = "File already exists"
-			}
+            # Check for cancellation before download
+            if ($CancellationToken.IsCancellationRequested) {
+                $result.Cancelled = $true
+                $result.Message = "Download cancelled"
+                return $result
+            }
+            
+            # Download logic
+            if (-not (Test-Path $FilePath)) {
+                $retryCount = 0
+                $downloadSuccessful = $false
+                $handledError = $false
+                $handledErrorMessage = ""
+                
+                # Output progress immediately using Write-Output instead of Write-Host
+                Write-Output "($FileIndex of $TotalFiles) Starting download: $Filename"
+                
+                while ($retryCount -lt $maxRetries -and -not $downloadSuccessful -and -not $handledError) {
+                    # Check for cancellation before each retry
+                    if ($CancellationToken.IsCancellationRequested) {
+                        $result.Cancelled = $true
+                        $result.Message = "Download cancelled"
+                        return $result
+                    }
+                    
+                    try {
+                        # Create HttpWebRequest for better error handling
+                        $request = [System.Net.HttpWebRequest]::Create($DownloadURL)
+                        $request.Method = "GET"
+                        $request.Timeout = 30000  # 30 seconds timeout
+                        $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        
+                        # Get response
+                        $response = $request.GetResponse()
+                        $httpResponse = $response -as [System.Net.HttpWebResponse]
+                        
+                        $responseStream = $response.GetResponseStream()
+                        
+                        # Create file stream
+                        $fileStream = [System.IO.File]::Create($FilePath)
+                        
+                        # Copy data with cancellation support
+                        $buffer = New-Object byte[] 8192
+                        $totalBytesRead = 0
+                        do {
+                            if ($CancellationToken.IsCancellationRequested) {
+                                $fileStream.Close()
+                                $responseStream.Close()
+                                $response.Close()
+                                if (Test-Path $FilePath) { Remove-Item $FilePath -Force }
+                                $result.Cancelled = $true
+                                $result.Message = "Download cancelled"
+                                return $result
+                            }
+                            
+                            $bytesRead = $responseStream.Read($buffer, 0, $buffer.Length)
+                            if ($bytesRead -gt 0) {
+                                $fileStream.Write($buffer, 0, $bytesRead)
+                                $totalBytesRead += $bytesRead
+                            }
+                        } while ($bytesRead -gt 0)
+                        
+                        # Get actual file size
+                        $fileSize = $fileStream.Length
+                        
+                        # Clean up streams
+                        $fileStream.Close()
+                        $responseStream.Close()
+                        $response.Close()
+                        
+                        # Check if file is actually valid (not empty or error page)
+                        if ($fileSize -eq 0) {
+                            Remove-Item $FilePath -Force
+                            throw [System.Exception]::new("Downloaded file is empty")
+                        }
+                        
+                        # Update database
+                        Invoke-SqliteQuery -DataSource $DBFilePath -Query $SetFileDownloadedQuery
+                        
+                        $result.Success = $true
+                        $result.Message = "Downloaded successfully"
+                        $downloadSuccessful = $true
+                        
+                    } catch [System.Net.WebException] {
+                        $BreakLoop = $false
+                        $ErrorMessage = $_.Exception.Message
+                        $StatusCode = 0
+                        
+                        # Get HTTP status code from WebException
+                        if ($_.Exception.Response) {
+                            $httpResponse = $_.Exception.Response -as [System.Net.HttpWebResponse]
+                            if ($httpResponse) {
+                                $StatusCode = [int]$httpResponse.StatusCode
+                                $StatusDescription = $httpResponse.StatusDescription
+                                $httpResponse.Close()
+                            }
+                        }
+                        
+                        # Clean up any partial file
+                        if (Test-Path $FilePath) {
+                            try { Remove-Item $FilePath -Force } catch { }
+                        }
+                        
+                        $retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $ErrorMessage -StatusCode $StatusCode -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
+                        
+                        if ($BreakLoop) {
+                            $handledError = $true
+                            if ($StatusCode -eq 404) {
+                                $handledErrorMessage = "File was deleted (404 error) - marked as deleted in database"
+                            } elseif ($StatusCode -eq 401) {
+                                $handledErrorMessage = "File is locked/private (401 error) - marked as downloaded in database"
+                            } else {
+                                $handledErrorMessage = "HTTP Error $StatusCode`: $ErrorMessage"
+                            }
+                            break
+                        }
+                        
+                    } catch [System.IO.IOException] {
+                        $BreakLoop = $false
+                        $ErrorMessage = $_.Exception.Message
+                        
+                        # Clean up any partial file
+                        if (Test-Path $FilePath) {
+                            try { Remove-Item $FilePath -Force } catch { }
+                        }
+                        
+                        $retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $ErrorMessage -StatusCode 0 -Site $SiteName -Type 1 -FileIdentifier $FileIdentifier -Username $Username
+                        
+                        if ($BreakLoop) {
+                            $handledError = $true
+                            $handledErrorMessage = "IO Error: $ErrorMessage"
+                            break
+                        }
+                        
+                    } catch [System.UnauthorizedAccessException] {
+                        $BreakLoop = $false
+                        $ErrorMessage = $_.Exception.Message
+                        
+                        $retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $ErrorMessage -StatusCode 403 -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
+                        
+                        if ($BreakLoop) {
+                            $handledError = $true
+                            $handledErrorMessage = "Access Error: $ErrorMessage"
+                            break
+                        }
+                        
+                    } catch {
+                        $BreakLoop = $false
+                        $StatusCode = 0
+                        $ErrorMessage = $_.Exception.Message
+                        
+                        # Clean up any partial file
+                        if (Test-Path $FilePath) {
+                            try { Remove-Item $FilePath -Force } catch { }
+                        }
+                        
+                        # Check if this is actually a WebException that wasn't caught above
+                        if ($_.Exception -is [System.Net.WebException]) {
+                            $webEx = $_.Exception -as [System.Net.WebException]
+                            if ($webEx.Response) {
+                                $httpResponse = $webEx.Response -as [System.Net.HttpWebResponse]
+                                if ($httpResponse) {
+                                    $StatusCode = [int]$httpResponse.StatusCode
+                                    $httpResponse.Close()
+                                }
+                            }
+                        }
+                        
+                        # Try to extract status code from error message patterns
+                        if ($StatusCode -eq 0) {
+                            if ($ErrorMessage -match "404|Not Found") {
+                                $StatusCode = 404
+                            } elseif ($ErrorMessage -match "403|Forbidden|Unauthorized") {
+                                $StatusCode = 403
+                            } elseif ($ErrorMessage -match "500|Internal Server Error") {
+                                $StatusCode = 500
+                            } elseif ($ErrorMessage -match "429|Too Many Requests") {
+                                $StatusCode = 429
+                            } elseif ($ErrorMessage -match "502|Bad Gateway") {
+                                $StatusCode = 502
+                            } elseif ($ErrorMessage -match "503|Service Unavailable") {
+                                $StatusCode = 503
+                            }
+                        }
+                        
+                        $retryCount, $BreakLoop = Handle-Errors -retryCount $retryCount -ErrorMessage $ErrorMessage -StatusCode $StatusCode -Site $SiteName -Type 2 -FileIdentifier $FileIdentifier -Username $Username
+                        
+                        if ($BreakLoop) {
+                            $handledError = $true
+                            if ($StatusCode -eq 404) {
+                                $handledErrorMessage = "File was deleted (404 error) - marked as deleted in database"
+                            } elseif ($StatusCode -eq 401) {
+                                $handledErrorMessage = "File is locked/private (401 error) - marked as downloaded in database"
+                            } else {
+                                $handledErrorMessage = "General Error (Status: $StatusCode): $ErrorMessage"
+                            }
+                            break
+                        }
+                    }
+                    
+                    # Add delay between retries (with cancellation check)
+                    if ($retryCount -lt $maxRetries -and -not $downloadSuccessful -and -not $handledError) {
+                        $delaySeconds = [Math]::Min(2 * $retryCount, 10)
+                        for ($i = 0; $i -lt $delaySeconds; $i++) {
+                            if ($CancellationToken.IsCancellationRequested) {
+                                $result.Cancelled = $true
+                                $result.Message = "Download cancelled"
+                                return $result
+                            }
+                            Start-Sleep -Seconds 1
+                        }
+                    }
+                }
+                
+                # Set the appropriate result message
+                if ($downloadSuccessful) {
+                    # Already set above
+                } elseif ($handledError) {
+                    $result.Message = $handledErrorMessage
+                } else {
+                    $result.Message = "Failed after $maxRetries attempts"
+                }
+                
+            } else {
+                # File already exists
+                Invoke-SqliteQuery -DataSource $DBFilePath -Query $SetFileDownloadedQuery
+                $result.Success = $true
+                $result.AlreadyExists = $true
+                $result.Message = "File already exists"
+            }
             
             return $result
             
@@ -978,6 +1033,7 @@ function Start-Download {
                 Message = "Error processing file: $($_.Exception.Message)"
                 FileIndex = $FileIndex
                 AlreadyExists = $false
+                Cancelled = $false
             }
         }
     }
@@ -987,97 +1043,131 @@ function Start-Download {
     $HandleErrorsFunction = Get-Command Handle-Errors | Select-Object -ExpandProperty Definition  
     $InvokeSqliteQueryFunction = Get-Command Invoke-SqliteQuery | Select-Object -ExpandProperty Definition
     
-    # Create jobs for each file
-    $Jobs = @()
-    $FileIndex = 0
-    
-    foreach ($File in $FileList) {
-        $FileIndex++
-        
-        # Create PowerShell instance
-        $PowerShell = [powershell]::Create()
-        $PowerShell.RunspacePool = $RunspacePool
-        
-        # Add script and parameters
-        [void]$PowerShell.AddScript($DownloadScriptBlock)
-        [void]$PowerShell.AddArgument($File)
-        [void]$PowerShell.AddArgument($SiteName)
-        [void]$PowerShell.AddArgument($DownloadBaseURL)
-        [void]$PowerShell.AddArgument($DownloadFolder)
-        [void]$PowerShell.AddArgument($invalidChars)
-        [void]$PowerShell.AddArgument($maxRetries)
-        [void]$PowerShell.AddArgument($DBFilePath)
-        [void]$PowerShell.AddArgument($CreateFilenameFunction)
-        [void]$PowerShell.AddArgument($HandleErrorsFunction)
-        [void]$PowerShell.AddArgument($InvokeSqliteQueryFunction)
-        [void]$PowerShell.AddArgument($FileIndex)
-        [void]$PowerShell.AddArgument($FilesRemaining)
-        [void]$PowerShell.AddArgument($FilenameTemplate)
-        [void]$PowerShell.AddArgument($PostID)
-        [void]$PowerShell.AddArgument($PostTitle)
-        [void]$PowerShell.AddArgument($PostDatePublishedFormatted)
-        [void]$PowerShell.AddArgument($PostDatePublishedFormattedShort)
-        [void]$PowerShell.AddArgument($PostTotalFiles)
-        
-        # Start the job
-        $AsyncResult = $PowerShell.BeginInvoke()
-        
-        $Jobs += [PSCustomObject]@{
-            PowerShell = $PowerShell
-            AsyncResult = $AsyncResult
-            FileIndex = $FileIndex
-        }
-    }
-    
-    # Wait for jobs to complete and collect results
-    $CompletedJobs = 0
+    # Process files in batches to manage memory usage
+    $BatchSize = [Math]::Min(100, $MaxConcurrentDownloads * 200)  # Process in batches
+    $ProcessedFiles = 0
     $FilesForConversion = @()
     
-    while ($CompletedJobs -lt $Jobs.Count) {
-        foreach ($Job in $Jobs) {
-            if ($Job.AsyncResult.IsCompleted -and $Job.PowerShell) {
-                try {
-                    $Result = $Job.PowerShell.EndInvoke($Job.AsyncResult)
-                    
-                    if ($Result.Success) {
-                        if ($Result.AlreadyExists) {
-                            Write-Host "($($Job.FileIndex) of $FilesRemaining) File $($Result.Filename) already exists, skipping..." -ForegroundColor Yellow
-                        } else {
-                            Write-Host "($($Job.FileIndex) of $FilesRemaining) Downloaded file $($Result.Filename).$($Result.FileExtension)" -ForegroundColor Green
-                            
-                            # Add to conversion list
-                            $fileObject = [PSCustomObject]@{
-                                FilePath      = $Result.FilePath
-                                Filename      = $Result.Filename
-                                FileExtension = $Result.FileExtension
-                            }
-                            $FilesForConversion += $fileObject
-                        }
-                    } else {
-                        Write-Host "($($Job.FileIndex) of $FilesRemaining) Failed: $($Result.Filename) - $($Result.Message)" -ForegroundColor Red
-                    }
-                    
-                } catch {
-                    Write-Host "Error retrieving job result: $($_.Exception.Message)" -ForegroundColor Red
-                } finally {
-                    # Clean up
-                    $Job.PowerShell.Dispose()
-                    $Job.PowerShell = $null
-                    $CompletedJobs++
-                }
+    for ($BatchStart = 0; $BatchStart -lt $FileList.Count; $BatchStart += $BatchSize) {
+        $BatchEnd = [Math]::Min($BatchStart + $BatchSize - 1, $FileList.Count - 1)
+        $CurrentBatch = $FileList[$BatchStart..$BatchEnd]
+        
+        Write-Host "Processing batch: files $($BatchStart + 1) to $($BatchEnd + 1) of $($FileList.Count)" -ForegroundColor Cyan
+        
+        # Create jobs for current batch
+        $Jobs = @()
+        
+        foreach ($File in $CurrentBatch) {
+            # Check for cancellation
+            if ($CancellationTokenSource.Token.IsCancellationRequested) {
+                Write-Host "Cancellation requested. Stopping job creation..." -ForegroundColor Yellow
+                break
+            }
+            
+            $ProcessedFiles++
+            
+            # Create PowerShell instance
+            $PowerShell = [powershell]::Create()
+            $PowerShell.RunspacePool = $RunspacePool
+            
+            # Add script and parameters
+            [void]$PowerShell.AddScript($DownloadScriptBlock)
+            [void]$PowerShell.AddArgument($File)
+            [void]$PowerShell.AddArgument($SiteName)
+            [void]$PowerShell.AddArgument($DownloadBaseURL)
+            [void]$PowerShell.AddArgument($DownloadFolder)
+            [void]$PowerShell.AddArgument($invalidChars)
+            [void]$PowerShell.AddArgument($maxRetries)
+            [void]$PowerShell.AddArgument($DBFilePath)
+            [void]$PowerShell.AddArgument($CreateFilenameFunction)
+            [void]$PowerShell.AddArgument($HandleErrorsFunction)
+            [void]$PowerShell.AddArgument($InvokeSqliteQueryFunction)
+            [void]$PowerShell.AddArgument($ProcessedFiles)
+            [void]$PowerShell.AddArgument($FilesRemaining)
+            [void]$PowerShell.AddArgument($FilenameTemplate)
+            [void]$PowerShell.AddArgument($PostID)
+            [void]$PowerShell.AddArgument($PostTitle)
+            [void]$PowerShell.AddArgument($PostDatePublishedFormatted)
+            [void]$PowerShell.AddArgument($PostDatePublishedFormattedShort)
+            [void]$PowerShell.AddArgument($PostTotalFiles)
+            [void]$PowerShell.AddArgument($CancellationTokenSource.Token)
+            
+            # Start the job
+            $AsyncResult = $PowerShell.BeginInvoke()
+            
+            $Jobs += [PSCustomObject]@{
+                PowerShell = $PowerShell
+                AsyncResult = $AsyncResult
+                FileIndex = $ProcessedFiles
             }
         }
         
-        # Small delay to prevent busy waiting
-        Start-Sleep -Milliseconds 100
+        # Wait for current batch jobs to complete
+        $CompletedJobs = 0
+        
+        while ($CompletedJobs -lt $Jobs.Count -and -not $CancellationTokenSource.Token.IsCancellationRequested) {
+            foreach ($Job in $Jobs) {
+                if ($Job.AsyncResult.IsCompleted -and $Job.PowerShell) {
+                    try {
+                        $Result = $Job.PowerShell.EndInvoke($Job.AsyncResult)
+                        
+                        if ($Result.Cancelled) {
+                            Write-Host "($($Job.FileIndex) of $FilesRemaining) Download cancelled: $($Result.Filename)" -ForegroundColor Yellow
+                        } elseif ($Result.Success) {
+                            if ($Result.AlreadyExists) {
+                                Write-Host "($($Job.FileIndex) of $FilesRemaining) File $($Result.Filename) already exists, skipping..." -ForegroundColor Yellow
+                            } else {
+                                Write-Host "($($Job.FileIndex) of $FilesRemaining) Downloaded file $($Result.Filename).$($Result.FileExtension)" -ForegroundColor Green
+                                
+                                # Add to conversion list
+                                $fileObject = [PSCustomObject]@{
+                                    FilePath      = $Result.FilePath
+                                    Filename      = $Result.Filename
+                                    FileExtension = $Result.FileExtension
+                                }
+                                $FilesForConversion += $fileObject
+                            }
+                        } else {
+                            Write-Host "($($Job.FileIndex) of $FilesRemaining) Failed: $($Result.Filename) - $($Result.Message)" -ForegroundColor Red
+                        }
+                        
+                    } catch {
+                        Write-Host "Error retrieving job result: $($_.Exception.Message)" -ForegroundColor Red
+                    } finally {
+                        # Clean up immediately to free memory
+                        $Job.PowerShell.Dispose()
+                        $Job.PowerShell = $null
+                        $CompletedJobs++
+                    }
+                }
+            }
+            
+            # Small delay to prevent busy waiting
+            Start-Sleep -Milliseconds 50
+        }
+        
+        # Force garbage collection after each batch
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+        [System.GC]::Collect()
+        
+        # Break if cancellation was requested
+        if ($CancellationTokenSource.Token.IsCancellationRequested) {
+            Write-Host "Cancellation requested. Stopping batch processing..." -ForegroundColor Yellow
+            break
+        }
     }
     
-    # Clean up runspace pool
+    # Clean up
     $RunspacePool.Close()
     $RunspacePool.Dispose()
+    $CancellationTokenSource.Dispose()
+    
+    # Unregister the event handler
+    Get-EventSubscriber | Where-Object { $_.SourceObject -eq [Console] } | Unregister-Event
     
     # Handle file conversion if needed
-    if ($ConvertFiles -and $FilesForConversion.Count -gt 0) {
+    if ($ConvertFiles -and $FilesForConversion.Count -gt 0 -and -not $CancellationTokenSource.Token.IsCancellationRequested) {
         # Group files by subfolder for conversion
         $FileGroups = $FilesForConversion | Group-Object { Split-Path (Split-Path $_.FilePath -Parent) -Leaf }
         
@@ -1087,5 +1177,9 @@ function Start-Download {
         }
     }
     
-    Write-Host "All downloads completed!" -ForegroundColor Green
+    if ($CancellationTokenSource.Token.IsCancellationRequested) {
+        Write-Host "Downloads were cancelled by user." -ForegroundColor Yellow
+    } else {
+        Write-Host "All downloads completed!" -ForegroundColor Green
+    }
 }
