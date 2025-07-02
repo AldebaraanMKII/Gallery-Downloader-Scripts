@@ -1,4 +1,4 @@
-The concurrent downloads issues where fixed in 14/08/2025.
+The concurrent downloads issues where fixed in 14/06/2025.
 
 
 # Gallery Downloader Scripts
