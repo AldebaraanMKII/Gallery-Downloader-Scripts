@@ -1,16 +1,5 @@
-## WARNING
-The concurrent downloads work correctly in the sense that they download the files and set them as downloaded in the database. But currently there's several issues:
-- <del>Error handling does not work</del> Fixed in 14/08/2025
-- The script was using up to 16gb of ram, and then go down to 8gb when i was downloading 450k files.
-- Using CTRL + C will not stop the script. It will keep downloading things in the background. Use the task manager to kill the powershell process instead.
-- The messages in the console take several minutes to start being displayed.
+The concurrent downloads issues where fixed in 14/06/2025.
 
-I'm working on fixing these issues. You can use a previous version without concurrent downloads by using:
-```
-git clone https://github.com/AldebaraanMKII/Gallery-Downloader-Scripts
-cd Gallery-Downloader-Scripts
-git reset --hard 381256c
-```
 
 # Gallery Downloader Scripts
 
