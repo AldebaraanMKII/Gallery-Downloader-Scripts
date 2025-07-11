@@ -185,7 +185,7 @@ function Download-Metadata-From-User {
 					
 					# Write-Host "`ntemp_query is $temp_query"
 					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-				
+                    
 					Write-Host "New user $Username added to database." -ForegroundColor Green
 					break
 				}
@@ -272,21 +272,6 @@ function Download-Metadata-From-User {
 							$temp_query = "UPDATE Users SET total_user_deviations = '$User_Deviations' WHERE username = '$Username'"
 							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 ########################################################
-							#load cur_offset and start search from there
-							$temp_query = "SELECT cur_offset FROM Users WHERE username = '$Username'"
-							$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-							
-							# Write-Output "(Line 562) Raw result: $($result | Out-String)"
-							# Check the result
-							if ($result.Count -gt 0) {
-								if ($result[0].cur_offset -gt 0) {
-									$Cur_Offset = $result[0].cur_offset
-									Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
-								} else {
-									$Cur_Offset = 0
-								}
-							}
-########################################################
 							#update the last_time_fetched_metadata column to NULL
 							# $temp_query = "UPDATE Users SET last_time_fetched_metadata = NULL WHERE username = '$Username'"
 							# Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
@@ -300,6 +285,20 @@ function Download-Metadata-From-User {
 ########################################################
 				}
 ########################################################
+			}
+			#load cur_offset and start search from there, regardless of stats of last_time_fetched_metadata
+			$temp_query = "SELECT cur_offset FROM Users WHERE username = '$Username'"
+			$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+			
+			# Write-Output "(Line 562) Raw result: $($result | Out-String)"
+			# Check the result
+			if ($result.Count -gt 0) {
+				if ($result[0].cur_offset -gt 0) {
+					$Cur_Offset = $result[0].cur_offset
+					Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
+				} else {
+					$Cur_Offset = 0
+				}
 			}
 ########################################################
 		}

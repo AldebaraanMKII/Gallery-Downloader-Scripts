@@ -212,7 +212,7 @@ function Download-Metadata-From-Creator {
 		$temp_query = "INSERT INTO Creators (creatorID, creatorName, service, date_indexed, date_updated)
 									VALUES ('$CreatorID', '$CreatorName', '$Service', '$DateIndexedFormatted',  '$DateUpdatedFormatted')"
 		Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-		
+        
 		Write-Host "New creator $CreatorName added to database." -ForegroundColor Green
 	} else {
 		Write-Host "found creator $CreatorName in database." -ForegroundColor Green
@@ -228,23 +228,24 @@ function Download-Metadata-From-Creator {
 				$HasMoreFiles = $false
 				Write-Host "The date this creator metadata was last fetched is higher than the date this creator was updated. Skipping..." -ForegroundColor Yellow
 ############################################
-			} else {
-				#load page_offset and start search from there
-				$temp_query = "SELECT page_offset FROM Creators WHERE creatorID = '$CreatorID' AND service = '$Service'"
-				$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-				
-				# Check the result
-				if ($result.Count -gt 0) {
-					if ($result[0].cur_offset -gt 0) {
-						$Cur_Offset = $result[0].page_offset
-						Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
-					} else {
-						$Cur_Offset = 0
-					}
-				}
-############################################
 			}
+			# } else {
 ############################################
+			# }
+############################################
+		}
+		#load page_offset and start search from there, regardless of stats of last_time_fetched_metadata
+		$temp_query = "SELECT page_offset FROM Creators WHERE creatorID = '$CreatorID' AND service = '$Service'"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+		
+		# Check the result
+		if ($result.Count -gt 0) {
+			if ($result[0].cur_offset -gt 0) {
+				$Cur_Offset = $result[0].page_offset
+				Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
+			} else {
+				$Cur_Offset = 0
+			}
 		}
 ############################################
 	}

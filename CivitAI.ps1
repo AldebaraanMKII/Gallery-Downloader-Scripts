@@ -129,55 +129,17 @@ function Download-Metadata-From-User {
 	# Write-Host "exists is $exists."
 	# Check the result
 	if ($exists -eq 0) {
-		
-		# $URL = "https://civitai.com/api/v1/creators?limit=$Limit&token=$API_Key&query=$Username"
-		# Write-Host "URL: $URL"
-		# Write-Host "Fetching creator $CreatorName metadata..."
-		# try {
-			# $response = Invoke-WebRequest -Uri "https://civitai.com/user/$Username/images" -ErrorAction Stop
-			# if ($response.StatusCode -eq 404) {
-				# Write-Output "Page not found (404 error)"
-			# } else {
-				# Write-Output "Page found"
-				
-				$username_url = "https://civitai.com/user/$Username/images"
-				
-				$temp_query = "INSERT INTO Users (username, url, cur_cursor)
-											VALUES ('$Username', '$username_url', NULL)"
-				# Write-Host "`ntemp_query is $temp_query"
-				Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-			
-				Write-Host "`nNew user $Username added to database." -ForegroundColor Green
-			# }
-		# } catch {
-			# Write-Output "An error occurred: $($_.Exception.Message)"
-		# }
-
-
-		# Make the API request and process the JSON response
-		# $Response = Invoke-RestMethod -Uri $URL -Method Get
-###################################
-		# Check if there are any files returned in the response
-		# if ($Response 0) {
-			# foreach ($user in $Response.items) {
-				# $cur_username = $user.username
-				# if ($cur_username = $Username) {
-					# $username_url = "https://civitai.com/user/$Username/images"
-					
-					# $temp_query = "INSERT INTO Users (username, url, cur_cursor)
-												# VALUES ('$Username', '$username_url', NULL)"
-					# Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-			
-					# Write-Host "`nNew user $Username added to database."
-				# }
-			# }
-		# } else {
-			# Write-Host "`nuser $Username not found."
-		# }
-		
+        $username_url = "https://civitai.com/user/$Username/images"
+        
+        $temp_query = "INSERT INTO Users (username, url, cur_cursor)
+                                    VALUES ('$Username', '$username_url', NULL)"
+        # Write-Host "`ntemp_query is $temp_query"
+        Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+        
+        Write-Host "`nNew user $Username added to database." -ForegroundColor Green
+##########################################
 	} else {
 		Write-Host "`nfound user $Username in database." -ForegroundColor Green
-###########################
 ##########################################
 		#load last_time_fetched_metadata and start search from there
 		$temp_query = "SELECT last_time_fetched_metadata FROM Users WHERE username = '$Username'"
@@ -203,35 +165,31 @@ function Download-Metadata-From-User {
 					$temp_query = "UPDATE Users SET last_time_fetched_metadata = NULL WHERE username = '$Username'"
 					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 					
-###########################
-				# Load cur_cursor and start search from there
-				$temp_query = "SELECT cur_cursor FROM Users WHERE username = '$Username'"
-				$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-				
-				# Check the result
-				if ($result.Count -gt 0) {
-					# Ensure proper NULL checking
-					if ($result[0].cur_cursor -ne $null) {
-						$Cursor = $result[0].cur_cursor
-						$CursorString = "&cursor=$Cursor"
-						Write-Host "Starting from cursor $Cursor." -ForegroundColor Green
-					} else {
-						$CursorString = ""
-						# Write-Host "No valid cursor found, starting fresh." -ForegroundColor Yellow
-					}
-				} else {
-					Write-Host "User not found or query returned no results." -ForegroundColor Red
+##########################################
 				}
-					
-###########################
-				}
-###########################
+##########################################
 			}
+            # Load cur_cursor and start search from there, regardless of stats of last_time_fetched_metadata
+            $temp_query = "SELECT cur_cursor FROM Users WHERE username = '$Username'"
+            $result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+            
+            # Check the result
+            if ($result.Count -gt 0) {
+                # Ensure proper NULL checking
+                if ($result[0].cur_cursor -ne $null) {
+                    $Cursor = $result[0].cur_cursor
+                    $CursorString = "&cursor=$Cursor"
+                    Write-Host "Starting from cursor $Cursor." -ForegroundColor Green
+                } else {
+                    $CursorString = ""
+                    # Write-Host "No valid cursor found, starting fresh." -ForegroundColor Yellow
+                }
+            } else {
+                Write-Host "User not found or query returned no results." -ForegroundColor Red
+            }
+##########################################
 		}
 ##########################################
-
-##########################################
-###########################
 	}
 ###########################
 	# The API is currently bugged and only returns SFW files when no parameter is set, so this is needed

@@ -1,10 +1,10 @@
 Import-Module PSSQLite
 
-###############################
+############################################
 # Import functions
 . "./(config) Rule34xxx.ps1"
 . "./Functions.ps1"
-###############################
+############################################
 function Download-Files-From-Database {
     param (
         [int]$Type
@@ -105,7 +105,7 @@ function Download-Files-From-Database {
 	}
 ######################################
 }
-######################################
+############################################
 # Function to download metadata
 function Download-Metadata-From-Query {
     param (
@@ -156,7 +156,7 @@ function Download-Metadata-From-Query {
 		Write-Host "New query added to database." -ForegroundColor Green
 	} else {
 		Write-Host "found query in database." -ForegroundColor Green
-###########################
+############################################
 		#load last_time_fetched_metadata and start search from there
 		$temp_query = "SELECT last_time_fetched_metadata FROM Queries WHERE query = '$Query' AND minID = $MinID AND maxID = $MaxID"
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -180,24 +180,7 @@ function Download-Metadata-From-Query {
 					#update the last_time_fetched_metadata column to NULL
 					$temp_query = "UPDATE Queries SET last_time_fetched_metadata = NULL WHERE query = '$Query' AND minID = $MinID AND maxID = $MaxID"
 					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-###########################
-					#load last_id and start search from there
-					$temp_query = "SELECT last_id FROM Queries WHERE query = '$Query' AND minID = $MinID AND maxID = $MaxID"
-					$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-					
-					# Check the result
-					if ($result.Count -gt 0) {
-						$LastID = $result[0].last_id
-						#if 0, skip id query
-						if ($LastID -eq 0) {
-							$IDString = ""
-						#if any number other than 0, start search from there
-						} else {
-							$IDString = " id:<$LastID"
-							Write-Host "Starting from ID $LastID." -ForegroundColor Green
-						}
-					}
-###########################
+############################################
 					#load results_per_page
 					$temp_query = "SELECT results_per_page FROM Queries WHERE query = '$Query' AND minID = $MinID AND maxID = $MaxID"
 					$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -207,13 +190,31 @@ function Download-Metadata-From-Query {
 						$Results_per_Page = $result[0].results_per_page
 						Write-Host "Fetching $Results_per_Page results per page." -ForegroundColor Green
 					}
-###########################
+############################################
 				}
+############################################
+			}
+############################################
+		}
+        
+		#load last_id and start search from there, regardless of stats from last_time_fetched_metadata
+		$temp_query = "SELECT last_id FROM Queries WHERE query = '$Query' AND minID = $MinID AND maxID = $MaxID"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+		
+		# Check the result
+		if ($result.Count -gt 0) {
+			$LastID = $result[0].last_id
+			#if 0, skip id query
+			if ($LastID -eq 0) {
+				$IDString = ""
+			#if any number other than 0, start search from there
+			} else {
+				$IDString = " id:<$LastID"
+				Write-Host "Starting from ID $LastID." -ForegroundColor Green
 			}
 		}
-###########################
+############################################
 	}
-###########################
 ############################################
 	if ($ContinueFetching) {
 		$HasMoreFiles = $true
