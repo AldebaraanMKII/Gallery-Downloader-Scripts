@@ -7,10 +7,14 @@ $FavoriteScanFolder = ""
 # $BaseURL = "https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&json=1"
 $BaseURL = "https://api.rule34.xxx/index.php?page=dapi&s=post&q=index" 	#xml because json doesn`t return post creation date
 $DownloadBaseURL = "https://api-cdn.rule34.xxx/images/"
-
+###############################
+# API Credentials - Required
+$API_Key = ""
+$UserID = ""
+###############################
 $DBFilename = "Rule34xxx.sqlite3"
 $DBFilePath = "./$DBFilename"
-
+###############################
 $TagDBFilename = "Tags_Rule34xxx.db"
 $TagDBFilePath = "./$TagDBFilename"
 ###### http response error handling
@@ -23,6 +27,7 @@ $MaxConcurrentDownloads = 3
 ###############################
 # this is the amount of File skips that will abort the current query search. 
 $MaxSkipsBeforeAborting = 50
+###############################
 # this is the number of Files that will be added at once to the database when processing metadata
 # so if you have results_per_page set to 1000 in the queries array and this set to 50, it will add things 20 times
 # otherwise all the 1000 items the metadata returned would need to be processed first before adding them to the database
