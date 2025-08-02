@@ -1,5 +1,3 @@
-The concurrent downloads issues where fixed in 14/06/2025.
-
 
 # Gallery Downloader Scripts
 
@@ -50,7 +48,13 @@ A collection of PowerShell scripts to download images/videos from various websit
    - Set the client_id and client_secret in "(config) DeviantArt.ps1" `$client_id` and `$client_secret` variables
    - Run the script once (see usage below) and copy the refresh token from your default browser, then paste it in the console
 
-5. Refer to the configuration files' comments to understand each option
+5. **Rule34xxx Setup:**
+   - (02/08/2025) Rule34xxx now requires a account and API key to access its API
+   - Create an account and generate an API key: [Link](https://rule34.xxx/index.php?page=account&s=options)
+   - Get your user ID as well
+   - Set it in "(config) Rule34xxx.ps1" `$API_Key` and `$UserID` variables
+     
+6. Refer to the configuration files' comments to understand each option
 
 ## Usage
 
