@@ -229,11 +229,10 @@ function Download-Metadata-From-Query {
 				
 				# https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit=1000&pid=200&tags=*huge_breasts%20-anthro*
 				# $URL = "$($BaseURL)&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
-				$URL = "$($BaseURL)&api_key=$API_Key&user_id=$UserID&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
+                $URL = "$($BaseURL)&api_key=$API_Key&user_id=$UserID&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
+				$ConsoleURL = "$($BaseURL)&api_key=API_Key_Here&user_id=UserID_Here&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
                 
-                
-                
-				Write-Host "`nURL: $URL" -ForegroundColor Yellow
+				Write-Host "`nURL: $ConsoleURL" -ForegroundColor Yellow
 				
 				Write-Host "Fetching metadata for page $Page..." -ForegroundColor Yellow
 ############################################
