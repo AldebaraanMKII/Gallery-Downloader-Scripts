@@ -60,7 +60,7 @@ function Download-Files-From-Database {
 				}
 #########################################
 				if ($ContinueFetching) {
-					$temp_query = "SELECT postID, title, date_published, total_files FROM Posts WHERE creatorName = '$CreatorName' AND downloaded = 0 AND deleted = 0;"
+					$temp_query = "SELECT postID, title, content, date_published, total_files FROM Posts WHERE creatorName = '$CreatorName' AND downloaded = 0 AND deleted = 0;"
 					
 					$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
 #########################################
@@ -71,6 +71,7 @@ function Download-Files-From-Database {
 						foreach ($Post in $result) {
 							$PostID = $Post.postID
 							$PostTitle = $Post.title
+							$PostContent = $Post.content
 							# $PostDatePublished = $Post.date_published
 							
 ######################################### Check if is null or empty
@@ -94,7 +95,7 @@ function Download-Files-From-Database {
 							$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
 #########################################
 							if ($result.Count -gt 0) {
-								Start-Download -SiteName "Kemono" -FileList $result
+								Start-Download -SiteName "Kemono" -FileList $result -PostContent $PostContent -PostContent $PostContent
 #########################################
 							} else {
 								Write-Host "Found 0 posts that meet the query requirements for creatorName $CreatorName. Skipping..." -ForegroundColor Red
@@ -799,4 +800,3 @@ function Execute-Function {
 	}
 }
 ############################################
-

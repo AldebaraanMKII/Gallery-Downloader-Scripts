@@ -133,7 +133,7 @@ function Convert-File {
 								} else {
 									$outputPath = Join-Path $Folder "$FileName.$ConvertFileType"
 								}
-	
+
 								$ffmpegCommand = "ffmpeg -i `"$FilePath`" $ConvertFileCommands `"$outputPath`" -loglevel quiet"
 								# Write-Host "Executing command: $ffmpegCommand" -ForegroundColor Cyan
 								Invoke-Expression $ffmpegCommand *> $null
@@ -144,13 +144,14 @@ function Convert-File {
 									Remove-Item -LiteralPath $FilePath
 								}
 ########################################################
-							} catch {
-								Write-Error "Error during conversion: $($_.Exception.Message)"
-							}
-							
-						} -ArgumentList $FilePath, $FileName, $ConvertFileType, $ConvertFileCommands, $Folder, $SaveConvertedFileSubfolder, $RemoveOriginalFileAfterConversion *> $null
-	
-						break
+									} catch {
+										Write-Error "Error during conversion: $($_.Exception.Message)"
+									}
+								
+						}
+ -ArgumentList $FilePath, $FileName, $ConvertFileType, $ConvertFileCommands, $Folder, $SaveConvertedFileSubfolder, $RemoveOriginalFileAfterConversion *> $null
+
+								break
 					}
 ########################################################
 				} catch {
@@ -287,6 +288,7 @@ function Process-BatchFiles {
     
     # Build batch update query for all matched files
     $updateValues = ($MatchedFiles.PatternMatch -join "','")
+    # $updateValues = ($MatchedFiles.PatternMatch -join "`',`'")
     if ($updateValues) {
         $batchUpdateQuery = "UPDATE Files SET favorite = 1, downloaded = 1 WHERE $Column IN ('$updateValues')"
         Invoke-SqliteQuery -DataSource $DBFilePath -Query $batchUpdateQuery
@@ -295,7 +297,7 @@ function Process-BatchFiles {
         
         # Handle renaming if enabled
         if ($RenameFileFavorite) {
-            Batch-Rename-Files -FilesToRename $MatchedFiles -Column $Column -DataQuery $DataQuery -Type $Type
+            Batch-Rename-Files -FilesToRename $matchedFiles -Column $Column -DataQuery $DataQuery -Type $Type
         }
     }
 }
@@ -309,7 +311,8 @@ function Batch-Rename-Files {
     )
     
     # Get all the necessary data in one query
-    $values = "'" + ($FilesToRename.PatternMatch -join "','") + "'"
+    # $values = "'`" + ($FilesToRename.PatternMatch -join "`',`'") + "'`"
+	$values = "'" + ($FilesToRename.PatternMatch -join "','") + "'"
     $fullDataQuery = "$DataQuery WHERE $Column IN ($values)"
     $results = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $fullDataQuery
     
@@ -560,40 +563,44 @@ function Handle-Errors {
 			Write-Output "Error: Out of disk space." -ForegroundColor Red
 			Exit #end script
 #####################################
-		} elseif ($ErrorMessage -like "*Unable to read data from the transport connection*") {
+		}
+		elseif ($ErrorMessage -like "*Unable to read data from the transport connection*") {
 			$delay = Calculate-Delay -retryCount $retryCount
 		
 			$retryCount++
 			Write-Output "Error: Connection forcibly closed by the remote host." -ForegroundColor Red
-	
+
 			Start-Sleep -Milliseconds $delay
 			
 			$BreakLoop = $false
 			return $retryCount, $BreakLoop
 #####################################
-		} elseif ($ErrorMessage -like "*The response ended prematurely*") {
+		}
+		elseif ($ErrorMessage -like "*The response ended prematurely*") {
 			$delay = Calculate-Delay -retryCount $retryCount
 		
 			$retryCount++
 			Write-Output "Error: The response ended prematurely." -ForegroundColor Red
-	
+
 			Start-Sleep -Milliseconds $delay
 			
 			$BreakLoop = $false
 			return $retryCount, $BreakLoop
 #####################################
-		} elseif ($ErrorMessage -like "*The SSL connection could not be established*") {
+		}
+		elseif ($ErrorMessage -like "*The SSL connection could not be established*") {
 			$delay = Calculate-Delay -retryCount $retryCount
 		
 			$retryCount++
 			Write-Output "Error: The response ended prematurely." -ForegroundColor Red
-	
+
 			Start-Sleep -Milliseconds $delay
 			
 			$BreakLoop = $false
 			return $retryCount, $BreakLoop
 #####################################
-		} else {
+		}
+		else {
 			Write-Output "An IO exception occurred: $($ErrorMessage)" -ForegroundColor Red
 			Exit #end script
 		}
@@ -656,7 +663,8 @@ function Handle-Errors {
 function Start-Download {
     param (
         [string]$SiteName,  # Site name (e.g., "Gelbooru", "CivitAI", etc.)
-        [PSCustomObject[]]$FileList   #list of files to download
+        [PSCustomObject[]]$FileList,   #list of files to download
+        [string]$PostContent = $null
     )
 
     $FileListForConversion = [System.Collections.ArrayList]::Synchronized([System.Collections.ArrayList]::new())
@@ -700,6 +708,7 @@ function Start-Download {
             $PostDatePublishedFormatted,
             $PostDatePublishedFormattedShort,
             $PostTotalFiles,
+            [string]$PostContent = $null,
             $CancellationToken
         )
         
@@ -778,6 +787,12 @@ function Start-Download {
             # Ensure download folder exists
             if (-not (Test-Path $DownloadSubFolder)) {
                 $null = New-Item -ItemType Directory -Path $DownloadSubFolder -Force
+            }
+
+            # Write post content to a text file
+            if (-not [string]::IsNullOrEmpty($PostContent)) {
+                $PostContentPath = Join-Path $DownloadSubFolder "post_content.txt"
+                Set-Content -Path $PostContentPath -Value $PostContent -Encoding UTF8
             }
             
             $result = @{
@@ -1090,12 +1105,13 @@ function Start-Download {
             [void]$PowerShell.AddArgument($PostDatePublishedFormatted)
             [void]$PowerShell.AddArgument($PostDatePublishedFormattedShort)
             [void]$PowerShell.AddArgument($PostTotalFiles)
+            [void]$PowerShell.AddArgument($PostContent)
             [void]$PowerShell.AddArgument($CancellationTokenSource.Token)
             
             # Start the job
             $AsyncResult = $PowerShell.BeginInvoke()
             
-            $Jobs += [PSCustomObject]@{
+            $Jobs += [PSCustomObject]@{ 
                 PowerShell = $PowerShell
                 AsyncResult = $AsyncResult
                 FileIndex = $ProcessedFiles
@@ -1120,7 +1136,7 @@ function Start-Download {
                                 Write-Host "($($Job.FileIndex) of $FilesRemaining) Downloaded file $($Result.Filename).$($Result.FileExtension)" -ForegroundColor Green
                                 
                                 # Add to conversion list
-                                $fileObject = [PSCustomObject]@{
+                                $fileObject = [PSCustomObject]@{ 
                                     FilePath      = $Result.FilePath
                                     Filename      = $Result.Filename
                                     FileExtension = $Result.FileExtension
