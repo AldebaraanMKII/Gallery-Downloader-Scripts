@@ -1059,7 +1059,8 @@ function Start-Download {
     $InvokeSqliteQueryFunction = Get-Command Invoke-SqliteQuery | Select-Object -ExpandProperty Definition
     
     # Process files in batches to manage memory usage
-    $BatchSize = [Math]::Min(100, $MaxConcurrentDownloads * 200)  # Process in batches
+    # $BatchSize = [Math]::Min(100, $MaxConcurrentDownloads * 200)  # Process in batches
+    $BatchSize = $MaxConcurrentDownloads * 1000  # Process in batches
     $ProcessedFiles = 0
     $FilesForConversion = @()
     
