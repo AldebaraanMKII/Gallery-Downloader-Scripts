@@ -306,6 +306,9 @@ function Download-Metadata-From-User {
 									$FileUrl = $FileUrl -replace "/width=\d+/", ''
 									#remove url to save database space
 									$FileUrl = $FileUrl -replace "xG1nkqKTMzGDvpLrqFT7WA/", ''
+									#New stuff 30-09-2025
+									$FileUrl = $FileUrl -replace "/original=true/", ''
+									$FileUrl = ""
 
 									if ($DownloadPromptMetadata) {
 										$FileMeta_Size = $File.meta.Size

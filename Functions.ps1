@@ -433,7 +433,7 @@ function Create-Filename {
 		$FileHeight = $row.height
 		$FileURL = $row.url
 		if ($FileURL = 'NULL') {
-			$FileURL = "xG1nkqKTMzGDvpLrqFT7WA/"
+			$FileURL = "xG1nkqKTMzGDvpLrqFT7WA"
 		}
 		
 		$FileCreatedAt = $row.createdAt
@@ -749,10 +749,12 @@ function Start-Download {
                 }
                 "CivitAI" {
                     $FileID, $Filename, $FileExtension, $FileURL, $FileFilename, $FileWidth, $Username = Create-Filename -row $File -Type 2
-                    $DownloadURL = "$($DownloadBaseURL)$($FileURL)$($FileFilename)/width=$FileWidth"
+                    # $DownloadURL = "$($DownloadBaseURL)$($FileURL)$($FileFilename)/width=$FileWidth"
+                    $DownloadURL = "$($DownloadBaseURL)$($FileURL)/$($FileFilename)/original=true/$($FileFilename)" #New 30-09-2025
                     $DownloadSubfolderIdentifier = "$Username"
                     $SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE id = '$FileID'"
                     $FileIdentifier = $FileID
+					# Write-Host "Download URL: $DownloadURL" -ForegroundColor Blue
                 }
                 "Kemono" {
                     $FileHash, $FileExtension, $FileURL, $FileFilenameExtension, $CreatorName, $Filename = Create-Filename -row $File -Type 3
