@@ -4,8 +4,8 @@ $DownloadFolder = ""
 $FavoriteScanFolder = ""
 ###############
 # API endpoint and other settings
-$BaseURL = "https://kemono.su/api/v1"
-$DownloadBaseURL = "https://n1.kemono.su/data"
+$BaseURL = "https://kemono.cr/api/v1"
+$DownloadBaseURL = "https://n1.kemono.cr/data"
 ###############
 $DBFilename = "Kemono.sqlite3"
 $DBFilePath = "./$DBFilename"

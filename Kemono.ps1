@@ -178,9 +178,10 @@ function Download-Metadata-From-Creator {
 	# Write-Host "URL: $URL"
 	
 	# Write-Host "Fetching creator $CreatorName metadata..."
-	
 	# Make the API request and process the JSON response
-	$Response = Invoke-RestMethod -Uri $URL -Method Get
+	# $Response = Invoke-RestMethod -Uri $URL -Method Get -Headers @{"Accept" = "text/css"}
+	$Response = Invoke-WebRequest -Uri $URL -Method Get -Headers @{"Accept" = "text/css"}
+	$Response = $Response.Content | ConvertFrom-Json
 ###################################
 	# Check if there are any files returned in the response
 	if ($Response -and $Response.Count -gt 0) {
@@ -226,8 +227,8 @@ function Download-Metadata-From-Creator {
 		if ($result.Count -gt 0) {
 			$DateDownloadCompleted = $result[0].last_time_fetched_metadata
 			if ($DateDownloadCompleted -gt $DateUpdatedFormatted) {
-				$HasMoreFiles = $false
-				Write-Host "The date this creator metadata was last fetched is higher than the date this creator was updated. Skipping..." -ForegroundColor Yellow
+				# $HasMoreFiles = $false
+				# Write-Host "The date this creator metadata was last fetched is higher than the date this creator was updated. Skipping..." -ForegroundColor Yellow
 ############################################
 			}
 			# } else {
@@ -259,7 +260,8 @@ function Download-Metadata-From-Creator {
 			while ($retryCount -lt $maxRetries) {
 				
 				# https://kemono.su/api/v1/{service}/user/{creator_id}?o=int(in steps of 50)
-				$URL = "$($BaseURL)/$Service/user/$($CreatorID)?o=$Cur_Offset"
+				# $URL = "$($BaseURL)/$Service/user/$($CreatorID)?o=$Cur_Offset"
+				$URL = "$($BaseURL)/$Service/user/$($CreatorID)/posts?o=$Cur_Offset"
 				Write-Host "`nURL: $URL" -ForegroundColor Yellow
 				
 				if ($Cur_Offset -gt 0) {
@@ -270,7 +272,9 @@ function Download-Metadata-From-Creator {
 ############################################
 				try {
 					# Make the API request and process the JSON response
-					$Response = Invoke-RestMethod -Uri $URL -Method Get
+					# $Response = Invoke-RestMethod -Uri $URL -Method Get -Headers @{"Accept" = "text/css"}
+					$Response = Invoke-WebRequest -Uri $URL -Method Get -Headers @{"Accept" = "text/css"}
+					$Response = $Response.Content | ConvertFrom-Json
 ############################################
 					# Check if there are any files returned in the response
 					if ($Response -and $Response.Count -gt 0) {
