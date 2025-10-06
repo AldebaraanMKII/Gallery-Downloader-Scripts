@@ -227,8 +227,8 @@ function Download-Metadata-From-Creator {
 		if ($result.Count -gt 0) {
 			$DateDownloadCompleted = $result[0].last_time_fetched_metadata
 			if ($DateDownloadCompleted -gt $DateUpdatedFormatted) {
-				# $HasMoreFiles = $false
-				# Write-Host "The date this creator metadata was last fetched is higher than the date this creator was updated. Skipping..." -ForegroundColor Yellow
+				$HasMoreFiles = $false
+				Write-Host "The date this creator metadata was last fetched is higher than the date this creator was updated. Skipping..." -ForegroundColor Yellow
 ############################################
 			}
 			# } else {
