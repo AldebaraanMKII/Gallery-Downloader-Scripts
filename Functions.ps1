@@ -1202,3 +1202,253 @@ function Start-Download {
         Write-Host "All downloads completed!" -ForegroundColor Green
     }
 }
+######################################
+
+############################################
+function Check-if-Refresh-Token-Expired {
+	$temp_query = "SELECT EXISTS(SELECT 1 from Auth WHERE refresh_token IS NOT NULL);"
+	$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+	$exists = $result."EXISTS(SELECT 1 from Auth WHERE refresh_token IS NOT NULL)"
+########################
+	# Check the result
+	if (!$exists) {
+		#no refresh token found
+		return $true
+########################
+	}	else {
+		#refresh token found, check if it expired
+		$temp_query = "SELECT refresh_token_creation_date FROM Auth"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+########################
+		# Check the result
+		if ($result.Count -gt 0) {
+			if (-not [string]::IsNullOrWhiteSpace($result[0].refresh_token_creation_date)) {
+				$DateCreated = $result[0].refresh_token_creation_date
+				
+				# Ensure both dates are DateTime objects
+				$CurrentDate = [datetime]::ParseExact((Get-Date -Format "yyyy-MM-dd HH:mm:ss"), "yyyy-MM-dd HH:mm:ss", $null)
+				$DateCreated = [datetime]::ParseExact($DateCreated, "yyyy-MM-dd HH:mm:ss", $null)
+
+				$DaysDifference = ($CurrentDate - $DateCreated).Days
+				# Write-Host "DaysDifference: $DaysDifference"
+				
+				if ($DaysDifference -ge 89) {
+					#expired
+					return $true
+				}	else {
+					$TimeToExpire = 90 - $DaysDifference
+					Write-Host "`nRefresh token will expire in $TimeToExpire days." -ForegroundColor Yellow
+					return $false
+				}
+########################
+			#refresh_token_creation_date = NULL
+			} else {
+				return $true
+			}
+########################
+		}
+########################
+	}
+########################
+}
+########################
+
+############################################
+function Check-if-Access-Token-Expired {
+	$temp_query = "SELECT EXISTS(SELECT 1 from Auth WHERE access_token IS NOT NULL);"
+	$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+	$exists = $result."EXISTS(SELECT 1 from Auth WHERE access_token IS NOT NULL)"
+########################
+	# Check the result
+	if (!$exists) {
+		#no access token found
+		return $true
+########################
+	}	else {
+		#access token found, check if it expired
+		$temp_query = "SELECT access_token_creation_date FROM Auth"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+########################
+		# Check the result
+		if ($result.Count -gt 0) {
+			if (-not [string]::IsNullOrWhiteSpace($result[0].access_token_creation_date)) {
+				$DateCreated = $result[0].access_token_creation_date
+				
+				# Ensure both dates are DateTime objects
+				$CurrentDate = [datetime]::ParseExact((Get-Date -Format "yyyy-MM-dd HH:mm:ss"), "yyyy-MM-dd HH:mm:ss", $null)
+				$DateCreated = [datetime]::ParseExact($DateCreated, "yyyy-MM-dd HH:mm:ss", $null)
+
+				# Write-Host "CurrentDate: $CurrentDate"
+				# Write-Host "DateCreated: $DateCreated"
+				
+				$SecondsDifference = ($CurrentDate - $DateCreated).TotalSeconds
+				# Write-Host "SecondsDifference: $SecondsDifference"
+				
+				if ($SecondsDifference -gt 3500) {
+					#expired
+					return $true
+				}	else {
+					$TimeToExpire = 3600 - $SecondsDifference
+					Write-Host "`nAccess token will expire in $TimeToExpire seconds." -ForegroundColor Yellow
+					return $false
+				}
+########################
+			#access_token_creation_date = NULL
+			} else {
+				return $true
+			}
+########################
+		}
+########################
+	}
+########################
+}
+########################
+
+########################
+# All access_token's expire after 1 hour, after expiration you either need to re-authorize the app or refresh your access token using the refresh_token from the /token request.
+# The refresh_token will expire after 3 months, after that time you must re-authorize the app. 
+# returns the access token
+function Get-Tokens-From-Authorization-Code {
+	Write-Host "`nRefresh token expired or doesn't exist. Getting a new one..." -ForegroundColor Yellow
+	
+	$authUrl = "https://www.deviantart.com/oauth2/authorize?response_type=code&client_id=$client_id&redirect_uri=$redirect_uri&scope=$scope&state=$state"
+
+	Write-Host "Opening default browser and redirecting to authorization URL..." -ForegroundColor Yellow
+	Write-Host "After the authorization is complete, copy the code and paste it into the console." -ForegroundColor Yellow
+	Start-Process $authUrl
+	$ExitFunction = $false
+####################################
+	while (!$ExitFunction) {
+		$AuthorizationCode = $(Write-Host "`nPlease type the authorization code you got from your browser: " -ForegroundColor green -NoNewLine; Read-Host) 
+	
+		$body = @{
+			grant_type = "authorization_code"
+			client_id = $client_id
+			client_secret = $client_secret
+			redirect_uri = $redirect_uri
+			code = $AuthorizationCode
+		}
+####################################
+		try {
+			$CurrentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+			$Response = Invoke-RestMethod -Uri "https://www.deviantart.com/oauth2/token" -Method Post -Body $body
+			# $Response
+			
+			#this expires in one hour
+			$Access_Token = $Response.access_token
+			#this expires in 3 months
+			$Refresh_Token = $Response.refresh_token
+			# return $access_token, $refresh_token
+			
+			$temp_query = "SELECT EXISTS(SELECT 1 from Auth WHERE refresh_token IS NOT NULL);"
+			$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+			$exists = $result."EXISTS(SELECT 1 from Auth WHERE refresh_token IS NOT NULL)"
+####################################
+			# Check the result
+			if ($exists -eq 0) {
+				#no refresh token found, insert it into table
+				$temp_query = "INSERT INTO Auth (access_token, access_token_creation_date, refresh_token, refresh_token_creation_date)
+											VALUES ('$Access_Token', '$CurrentDate', '$Refresh_Token', '$CurrentDate')"
+				Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+				Write-Host "`nAdded new access and refresh tokens to database." -ForegroundColor Green
+				$ExitFunction = $true
+				return $Access_Token
+			} else {
+				#refresh token found, update it
+				$temp_query = "UPDATE Auth SET access_token = '$Access_Token', access_token_creation_date = '$CurrentDate', refresh_token = '$Refresh_Token', refresh_token_creation_date = '$CurrentDate'"
+				Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+				Write-Host "`nAdded new access and refresh tokens to database." -ForegroundColor Green
+				$ExitFunction = $true
+				return $Access_Token
+			}
+####################################
+		#errors
+		} catch {
+			if ($Response.error -eq "invalid_request") {
+				Write-Host "Authorization code is invalid!" -ForegroundColor Yellow
+			} else {
+				Write-Host "(Get-Tokens-From-Authorization-Code) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
+			}
+####################################
+		}
+####################################
+	}
+####################################
+}
+####################################
+
+########################
+# If the access_token expires after 1 hour, you can refresh it using the refresh_token.
+function Refresh-Access-Token {
+	$temp_query = "SELECT refresh_token FROM Auth"
+	$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+	$Refresh_Token = $result[0].refresh_token
+	
+	# Write-Host "(Refresh-Access-Token) refresh token: $Refresh_Token" -ForegroundColor Yellow
+	$body = @{
+		grant_type = "refresh_token"
+		client_id = $client_id
+		client_secret = $client_secret
+		refresh_token = $Refresh_Token
+	}
+	
+	try {
+		$CurrentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+		$refreshResponse = Invoke-RestMethod -Uri "https://www.deviantart.com/oauth2/token" -Method Post -Body $body
+		# $refreshResponse
+		
+		$Access_Token = $refreshResponse.access_token
+		$temp_query = "UPDATE Auth SET access_token = '$Access_Token', access_token_creation_date = '$CurrentDate'"
+		Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+		return $Access_Token
+########################
+	} catch {
+		if ($_.Exception.Response.StatusCode -eq 400) {
+			Write-Host "(Refresh-Access-Token) Received error code 400. This propably means the refresh token is invalid." -ForegroundColor Red
+			# Attempt to get a new token
+			$Access_Token = Get-Tokens-From-Authorization-Code
+			return $Access_Token
+		} else {
+			Write-Host "(Refresh-Access-Token) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
+		}
+	}
+####################################
+}
+####################################
+# If the access_token expires after 1 hour, you can refresh it using the refresh_token.
+function Refresh-Access-Token-Client-Credentials {
+	# $temp_query = "SELECT refresh_token FROM Auth"
+	# $result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+	# $Refresh_Token = $result[0].refresh_token
+	
+	# Write-Host "(Refresh-Access-Token) refresh token: $Refresh_Token" -ForegroundColor Yellow
+	$body = @{
+		grant_type = "client_credentials"
+		client_id = $client_id
+		client_secret = $client_secret
+	}
+	
+	try {
+		$CurrentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+		$refreshResponse = Invoke-RestMethod -Uri "https://www.deviantart.com/oauth2/token" -Method Post -Body $body
+		# $refreshResponse
+		
+		$Access_Token = $refreshResponse.access_token
+		$temp_query = "UPDATE Auth SET access_token = '$Access_Token', access_token_creation_date = '$CurrentDate'"
+		Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+		return $Access_Token
+########################
+	} catch {
+		if ($_.Exception.Response.StatusCode -eq 400) {
+			Write-Host "(Refresh-Access-Token) Received error code 400. This propably means the refresh token is invalid." -ForegroundColor Red
+			# Attempt to get a new token
+			$Access_Token = Get-Tokens-From-Authorization-Code
+			return $Access_Token
+		} else {
+			Write-Host "(Refresh-Access-Token) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
+		}
+	}
+####################################
+}
+####################################

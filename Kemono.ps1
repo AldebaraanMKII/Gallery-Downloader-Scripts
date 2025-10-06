@@ -669,6 +669,8 @@ function Process-Creators {
 		$Files_To_Exclude = $Creator[5]
 		
 		Download-Metadata-From-Creator -CreatorName $CreatorName -CreatorID $CreatorID -Service $Service -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude -Files_To_Exclude $Files_To_Exclude
+		
+		Start-Sleep -Milliseconds $delay
 	}
 }
 ############################################
