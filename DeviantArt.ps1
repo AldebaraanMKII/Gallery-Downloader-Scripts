@@ -751,7 +751,7 @@ function Process-Users {
 		
 		Download-Metadata-From-User -Username $Username -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
 		
-		Start-Sleep -Milliseconds $TimeToWait
+		# Start-Sleep -Milliseconds $TimeToWait
 	}
 }
 ############################################
