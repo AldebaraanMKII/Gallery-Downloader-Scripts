@@ -670,7 +670,7 @@ function Process-Creators {
 		
 		Download-Metadata-From-Creator -CreatorName $CreatorName -CreatorID $CreatorID -Service $Service -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude -Files_To_Exclude $Files_To_Exclude
 		
-		Start-Sleep -Milliseconds $delay
+		Start-Sleep -Milliseconds $TimeToWait
 	}
 }
 ############################################

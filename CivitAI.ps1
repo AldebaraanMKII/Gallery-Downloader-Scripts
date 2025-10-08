@@ -508,7 +508,7 @@ function Process-Users {
 		
 		Download-Metadata-From-User -Username $Username
 		
-		Start-Sleep -Milliseconds $delay
+		Start-Sleep -Milliseconds $TimeToWait
 	}
 }
 ############################################
