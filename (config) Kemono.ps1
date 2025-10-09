@@ -8,7 +8,7 @@ $BaseURL = "https://kemono.cr/api/v1"
 $DownloadBaseURL = "https://n1.kemono.cr/data"
 ###############
 $DBFilename = "Kemono.sqlite3"
-$DBFilePath = "./$DBFilename"
+$DBFilePath = "$PSScriptRoot/$DBFilename"
 ###############
 # Here you can choose how the output file will be named
 # available options are: %CreatorID%, %CreatorName%, %PostID%, %PostTitle%, %PostPublishDate% (format: yyyy-mm-dd hh-mm-ss), %PostPublishDateShort% (format: yyyy-mm-dd), %FileHash%, %Filename%, %FileIndex%, %PostTotalFiles%

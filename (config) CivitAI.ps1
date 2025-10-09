@@ -9,7 +9,7 @@ $BaseURL = "https://civitai.com/api/v1/images"
 $DownloadBaseURL = "https://image.civitai.com/"
 ###############
 $DBFilename = "CivitAI.sqlite3"
-$DBFilePath = "./$DBFilename"
+$DBFilePath = "$PSScriptRoot/$DBFilename"
 ###############
 # API key for authentication
 $API_Key = ""

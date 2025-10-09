@@ -2,8 +2,8 @@ Import-Module PSSQLite
 
 ############################################
 # Import functions
-. "./(config) Rule34xxx.ps1"
-. "./Functions.ps1"
+. "$PSScriptRoot/(config) Rule34xxx.ps1"
+. "$PSScriptRoot/Functions.ps1"
 ############################################
 function Download-Files-From-Database {
     param (
@@ -673,7 +673,7 @@ function Graphical-Options {
 	try {
 		# Start logging
 		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
-		Start-Transcript -Path "./logs/Rule34xxx_$($CurrentDate).log" -Append
+		Start-Transcript -Path "$PSScriptRoot/logs/Rule34xxx_$($CurrentDate).log" -Append
 		$exitScript = $false
 		while (-not $exitScript) {
 			Write-Host "`nRule34xxx Powershell Downloader" -ForegroundColor Green
@@ -750,7 +750,7 @@ function Execute-Function {
 	try {
 		# Start logging
 		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
-		Start-Transcript -Path "./logs/Rule34xxx_$($CurrentDate).log" -Append
+		Start-Transcript -Path "$PSScriptRoot/logs/Rule34xxx_$($CurrentDate).log" -Append
 ###############################
 		if ($function -eq 1) {
 			Backup-Database

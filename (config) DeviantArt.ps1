@@ -4,7 +4,7 @@ $DownloadFolder = ""
 $FavoriteScanFolder = ""
 ###############
 $DBFilename = "DeviantArt.sqlite3"
-$DBFilePath = "./$DBFilename"
+$DBFilePath = "$PSScriptRoot/$DBFilename"
 ###############
 #metadata fetch per request, minimum 1 maximum 24
 $Limit = 24

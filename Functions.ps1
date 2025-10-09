@@ -1,7 +1,7 @@
 function Backup-Database {
 	if ($BackupDBOnStart) {
 		# Get the current date to use in the backup archive name
-		$BackupFolderPath = "./backups"
+		$BackupFolderPath = "$PSScriptRoot/backups"
 		$DateTime = Get-Date -Format "yyyyMMdd-HHmmss"
 		$BackupFileName = "$DBFilename $DateTime.7z"
 		$BackupFilePath = Join-Path -Path $BackupFolderPath -ChildPath $BackupFileName

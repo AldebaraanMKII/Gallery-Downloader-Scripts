@@ -2,10 +2,10 @@
 $date = Get-Date -Format "yyyyMMdd_HHmmss"
 
 # Define the subfolder path
-$logPath = "./logs"
+$logPath = "$PSScriptRoot/logs"
 
 # Compress all .log files in the 'log' subfolder into a 7z archive
-& 7z a "$logPath/Logs backup $date.7z" "$logPath/*.log"
+& 7z a "$logPath/Logs_Backup_$date.7z" "$logPath/*.log"
 
 # Delete the original log files after compression
 Remove-Item -Path "$logPath/*.log"

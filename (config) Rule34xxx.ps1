@@ -13,10 +13,10 @@ $API_Key = ""
 $UserID = ""
 ###############################
 $DBFilename = "Rule34xxx.sqlite3"
-$DBFilePath = "./$DBFilename"
+$DBFilePath = "$PSScriptRoot/$DBFilename"
 ###############################
 $TagDBFilename = "Tags_Rule34xxx.db"
-$TagDBFilePath = "./$TagDBFilename"
+$TagDBFilePath = "$PSScriptRoot/$TagDBFilename"
 ###### http response error handling
 $maxRetries = 5
 $initialDelay = 5000  # Initial delay in milliseconds

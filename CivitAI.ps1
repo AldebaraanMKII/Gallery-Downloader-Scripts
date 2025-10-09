@@ -2,8 +2,8 @@ Import-Module PSSQLite
 
 ###############################
 # Import functions and configuration
-. "./(config) CivitAI.ps1"
-. "./Functions.ps1"
+. "$PSScriptRoot/(config) CivitAI.ps1"
+. "$PSScriptRoot/Functions.ps1"
 ###############################
 function Download-Files-From-Database {
     param (
@@ -516,7 +516,7 @@ function Graphical-Options {
 	try {
 		# Start logging
 		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
-		Start-Transcript -Path "./logs/CivitAI_$($CurrentDate).log" -Append
+		Start-Transcript -Path "$PSScriptRoot/logs/CivitAI_$($CurrentDate).log" -Append
 		
 		$exitScript = $false
 		while (-not $exitScript) {
@@ -593,7 +593,7 @@ function Execute-Function {
 	try {
 		# Start logging
 		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
-		Start-Transcript -Path "./logs/CivitAI_$($CurrentDate).log" -Append
+		Start-Transcript -Path "$PSScriptRoot/logs/CivitAI_$($CurrentDate).log" -Append
 ############################################
 		if ($function -eq 1) {
 			Backup-Database
