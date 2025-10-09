@@ -33,6 +33,8 @@ $PostContentSkip = $false
 # if set to true, a subfolder will be created for each post ([postID] postTitle), otherwise all files will be under the service/creator [creatorID] folder
 $CreateSubfolderForPosts = $false
 ###############################
+#how many hours must pass after fetching metadata for a user's entire gallery before the script will check it again
+$TimeToCheckAgainMetadata = 168
 #how many hours must pass after downloading a user's entire gallery before the script will try to download any new files from them in the database
 #this is to speed things up when the script is closed for whatever reason
 $TimeToCheckAgainDownload = 168

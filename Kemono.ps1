@@ -1,10 +1,10 @@
 Import-Module PSSQLite
 
-###############################
+########################################################
 # Import functions
 . "./(config) Kemono.ps1"
 . "./Functions.ps1"
-###############################
+########################################################
 function Download-Files-From-Database {
     param (
         [int]$Type
@@ -139,11 +139,11 @@ function Download-Files-From-Database {
 	}
 #########################################
 }
-#########################################
+########################################################
 
 
 
-######################################
+########################################################
 # Function to download metadata
 function Download-Metadata-From-Creator {
     param (
@@ -165,42 +165,6 @@ function Download-Metadata-From-Creator {
 	
 	#fix name
 	$CreatorName = $CreatorName -replace "'", ""
-########################################
-	# "id": "IDHere",
-	# "name": "NameHere",
-	# "service": "patreon",
-	# "indexed": "2023-06-23T06:09:18.245549",
-	# "updated": "2024-08-27T17:32:11.991433",
-	# "public_id": "NameHere",
-	# "relation_id": nul		
-	# {https://kemono.su/api/v1/service/user/usedID/profile
-	$URL = "$($BaseURL)/$Service/user/$($CreatorID)/profile"
-	# Write-Host "URL: $URL"
-	
-	# Write-Host "Fetching creator $CreatorName metadata..."
-	# Make the API request and process the JSON response
-	# $Response = Invoke-RestMethod -Uri $URL -Method Get -Headers @{"Accept" = "text/css"}
-	$Response = Invoke-WebRequest -Uri $URL -Method Get -Headers @{"Accept" = "text/css"}
-	$Response = $Response.Content | ConvertFrom-Json
-###################################
-	# Check if there are any files returned in the response
-	if ($Response -and $Response.Count -gt 0) {
-		foreach ($Creator in $Response) {
-			$DateIndexed = $Creator.indexed
-			$DateUpdated = $Creator.updated
-			
-			$DateIndexed = $DateIndexed -replace 'T', ' ' -replace '\.\d+', ''
-			$DateUpdated = $DateUpdated -replace 'T', ' ' -replace '\.\d+', ''
-			
-			# Write-Host "DateIndexed: $DateIndexed"
-			# Write-Host "DateUpdated: $DateUpdated"
-			
-			$DateIndexedFormatted = [datetime]::ParseExact($DateIndexed, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
-			$DateUpdatedFormatted = [datetime]::ParseExact($DateUpdated, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
-		}
-	}
-#####################################
-	
 ######### Add creator if it doesn`t exist
 	$temp_query = "SELECT EXISTS(SELECT 1 from Creators WHERE creatorID = '$CreatorID' AND service = '$Service');"
 	$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
@@ -210,49 +174,123 @@ function Download-Metadata-From-Creator {
 
 	# Check the result
 	if ($exists -eq 0) {
+########################################################
+		# "id": "IDHere",
+		# "name": "NameHere",
+		# "service": "patreon",
+		# "indexed": "2023-06-23T06:09:18.245549",
+		# "updated": "2024-08-27T17:32:11.991433",
+		# "public_id": "NameHere",
+		# "relation_id": nul		
+		# {https://kemono.su/api/v1/service/user/usedID/profile
+		$URL = "$($BaseURL)/$Service/user/$($CreatorID)/profile"
+		# Write-Host "URL: $URL"
+		
+		# Write-Host "Fetching creator $CreatorName metadata..."
+		# Make the API request and process the JSON response
+		# $Response = Invoke-RestMethod -Uri $URL -Method Get
+		$Response = Invoke-WebRequest -Uri $URL -Method Get -Headers @{"Accept" = "text/css"}
+		$Response = $Response.Content | ConvertFrom-Json
+########################################################
+		# Check if there are any files returned in the response
+		if ($Response -and $Response.Count -gt 0) {
+			foreach ($Creator in $Response) {
+				$DateIndexed = $Creator.indexed
+				$DateUpdated = $Creator.updated
+				
+				$DateIndexed = $DateIndexed -replace 'T', ' ' -replace '\.\d+', ''
+				$DateUpdated = $DateUpdated -replace 'T', ' ' -replace '\.\d+', ''
+				
+				# Write-Host "DateIndexed: $DateIndexed"
+				# Write-Host "DateUpdated: $DateUpdated"
+				
+				$DateIndexedFormatted = [datetime]::ParseExact($DateIndexed, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
+				$DateUpdatedFormatted = [datetime]::ParseExact($DateUpdated, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
+			}
+		}
+########################################################
 		# $CurrentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 		$temp_query = "INSERT INTO Creators (creatorID, creatorName, service, date_indexed, date_updated)
 									VALUES ('$CreatorID', '$CreatorName', '$Service', '$DateIndexedFormatted',  '$DateUpdatedFormatted')"
 		Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
         
 		Write-Host "New creator $CreatorName added to database." -ForegroundColor Green
+########################################################
 	} else {
 		Write-Host "found creator $CreatorName in database." -ForegroundColor Green
-############################################
 		#load last_time_fetched_metadata
 		$temp_query = "SELECT last_time_fetched_metadata FROM Creators WHERE creatorID = '$CreatorID' AND service = '$Service'"
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
 		
 		# Check the result
 		if ($result.Count -gt 0) {
-			$DateDownloadCompleted = $result[0].last_time_fetched_metadata
-			if ($DateDownloadCompleted -gt $DateUpdatedFormatted) {
-				$HasMoreFiles = $false
-				Write-Host "The date this creator metadata was last fetched is higher than the date this creator was updated. Skipping..." -ForegroundColor Yellow
-############################################
-			}
-			# } else {
-############################################
-			# }
-############################################
-		}
-		#load page_offset and start search from there, regardless of stats of last_time_fetched_metadata
-		$temp_query = "SELECT page_offset FROM Creators WHERE creatorID = '$CreatorID' AND service = '$Service'"
-		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+			if (-not [string]::IsNullOrWhiteSpace($result[0].last_time_fetched_metadata)) {
+				$DateMetadataFetchCompleted = $result[0].last_time_fetched_metadata
+				$CurrentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+########################################################
+				# Ensure both dates are DateTime objects
+				$CurrentDate = [datetime]::ParseExact((Get-Date -Format "yyyy-MM-dd HH:mm:ss"), "yyyy-MM-dd HH:mm:ss", $null)
+				$DateMetadataFetchCompleted = [datetime]::ParseExact($DateMetadataFetchCompleted, "yyyy-MM-dd HH:mm:ss", $null)
 		
-		# Check the result
-		if ($result.Count -gt 0) {
-			if ($result[0].cur_offset -gt 0) {
-				$Cur_Offset = $result[0].page_offset
-				Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
-			} else {
-				$Cur_Offset = 0
+				$TimeDifference = $CurrentDate - $DateMetadataFetchCompleted
+				$HoursDifference = $TimeDifference.TotalHours
+########################################################
+				if ($HoursDifference -lt $TimeToCheckAgainMetadata) {
+					$HasMoreFiles = $false
+					Write-Host "This user was updated less than $TimeToCheckAgainMetadata hours ago. Skipping..." -ForegroundColor Yellow
+########################################################
+				} else {
+					$URL = "$($BaseURL)/$Service/user/$($CreatorID)/profile"
+					
+					$Response = Invoke-WebRequest -Uri $URL -Method Get -Headers @{"Accept" = "text/css"}
+					$Response = $Response.Content | ConvertFrom-Json
+########################################################
+					# Check if there are any files returned in the response
+					if ($Response -and $Response.Count -gt 0) {
+						foreach ($Creator in $Response) {
+							$DateIndexed = $Creator.indexed
+							$DateUpdated = $Creator.updated
+							
+							$DateIndexed = $DateIndexed -replace 'T', ' ' -replace '\.\d+', ''
+							$DateUpdated = $DateUpdated -replace 'T', ' ' -replace '\.\d+', ''
+							
+							# Write-Host "DateIndexed: $DateIndexed"
+							# Write-Host "DateUpdated: $DateUpdated"
+							
+							$DateIndexedFormatted = [datetime]::ParseExact($DateIndexed, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
+							$DateUpdatedFormatted = [datetime]::ParseExact($DateUpdated, "MM/dd/yyyy HH:mm:ss", $null).ToString("yyyy-MM-dd HH:mm:ss")
+						}
+########################################################
+						#if time that this user was last fetched is higher than the actual update time from kemono, skip it
+						if ($DateMetadataFetchCompleted -gt $DateUpdatedFormatted) {
+							$HasMoreFiles = $false
+							Write-Host "This user was updated . Skipping..." -ForegroundColor Yellow
+						}
+					}
+########################################################
+				}
+########################################################
 			}
+########################################################
+			#load page_offset and start search from there, regardless of stats of last_time_fetched_metadata
+			$temp_query = "SELECT page_offset FROM Creators WHERE creatorID = '$CreatorID' AND service = '$Service'"
+			$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+			
+			# Check the result
+			if ($result.Count -gt 0) {
+				if ($result[0].cur_offset -gt 0) {
+					$Cur_Offset = $result[0].page_offset
+					Write-Host "Starting from offset $Cur_Offset." -ForegroundColor Green
+				} else {
+					$Cur_Offset = 0
+				}
+			}
+########################################################
 		}
-############################################
+########################################################
 	}
-############################################
-############################################
+########################################################
+########################################################
 		$CurrentSkips = 0
 		# Loop through pages of files for the user
 		while ($HasMoreFiles) {
