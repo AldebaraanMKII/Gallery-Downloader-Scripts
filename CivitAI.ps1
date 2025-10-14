@@ -510,6 +510,8 @@ function Process-Users {
 		
 		# Start-Sleep -Milliseconds $TimeToWait
 	}
+	
+	Download-Files-From-Database -Type 1
 }
 ############################################
 function Graphical-Options {
