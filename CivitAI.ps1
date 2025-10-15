@@ -255,19 +255,23 @@ function Download-Metadata-From-User {
 						if ($Response.items -and $Response.items.Count -gt 0) {
 							Write-Host "Number of results found: $($Response.items.Count)" -ForegroundColor Green
 ############################################
+							# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+							$existingFileIDs = [System.Collections.Generic.HashSet[int]]::new()
+							$temp_query = "SELECT id FROM Files WHERE username = '$Username';"
+							$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+							if ($result.Count -gt 0) {
+								foreach ($row in $result) {
+									$null = $existingFileIDs.Add($row.id)
+								}
+							}
+
 							#files
 							$stopwatchCursor = [System.Diagnostics.Stopwatch]::StartNew()
 							$sqlScript = "BEGIN TRANSACTION; " 
 							foreach ($File in $Response.items) {
 								$FileID = $File.id
 ##########################################
-								$temp_query = "SELECT EXISTS(SELECT 1 FROM Files WHERE id = '$FileID');"
-								$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-								
-								# Extract the value from the result object
-								$exists = $result."EXISTS(SELECT 1 FROM Files WHERE id = '$FileID')"
-	
-								if ($exists -eq 1) {
+								if ($existingFileIDs.Contains($FileID)) {
 									Write-Host "FileID $FileID already exists in database, skipping..." -ForegroundColor Yellow
 									$CurrentSkips++
 									
@@ -510,8 +514,6 @@ function Process-Users {
 		
 		# Start-Sleep -Milliseconds $TimeToWait
 	}
-	
-	Download-Files-From-Database -Type 1
 }
 ############################################
 function Graphical-Options {

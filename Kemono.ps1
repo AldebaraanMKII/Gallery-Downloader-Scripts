@@ -291,6 +291,16 @@ function Download-Metadata-From-Creator {
 	}
 ########################################################
 ########################################################
+		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+		$existingPostIDs = [System.Collections.Generic.HashSet[string]]::new()
+		$temp_query = "SELECT postID FROM Posts WHERE creatorName = '$CreatorName';"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+		if ($result.Count -gt 0) {
+			foreach ($row in $result) {
+				$null = $existingPostIDs.Add($row.postID)
+			}
+		}
+
 		$CurrentSkips = 0
 		# Loop through pages of files for the user
 		while ($HasMoreFiles) {
@@ -348,13 +358,7 @@ function Download-Metadata-From-Creator {
 
 
 							if ($Continue) {
-								$temp_query = "SELECT EXISTS(SELECT 1 from Posts WHERE postID = '$PostID');"
-								$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-								
-								# Extract the value from the result object
-								$exists = $result."EXISTS(SELECT 1 from Posts WHERE postID = '$PostID')"
-
-								if ($exists -eq 1) {
+								if ($existingPostIDs.Contains($PostID)) {
 									Write-Host "`n`nPost ID $PostID already exists in database, skipping..." -ForegroundColor Yellow
 									$CurrentSkips++
 									
@@ -413,6 +417,16 @@ function Download-Metadata-From-Creator {
 									# Write-Host "`n temp query from line 391 is $temp_query"
 									Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 ############################################
+									# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+									$existingFileHashes = [System.Collections.Generic.HashSet[string]]::new()
+									$temp_query = "SELECT hash FROM Files WHERE creatorName = '$CreatorName';"
+									$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+									if ($result.Count -gt 0) {
+										foreach ($row in $result) {
+											$null = $existingFileHashes.Add($row.hash)
+										}
+									}
+
 									#files
 									$stopwatchFile = [System.Diagnostics.Stopwatch]::StartNew()
 									$sqlScript = "BEGIN TRANSACTION; "
@@ -458,13 +472,7 @@ function Download-Metadata-From-Creator {
 													# Split the filename and extension
 													$FileHash, $HashExtension = $HashWithExtension -split '\.'
 													
-													$temp_query = "SELECT exists(SELECT 1 FROM Files WHERE hash = '$FileHash');"
-													$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-													
-													# Extract the value from the result object
-													$exists = $result."EXISTS(SELECT 1 from Files WHERE hash = '$FileHash')"
-													
-													if ($exists -eq 1) {
+													if ($existingFileHashes.Contains($FileHash)) {
 														Write-Host "File $Filename ($FileHash) already exists in database, skipping..." -ForegroundColor Yellow
 													}	else {
 														# Write-Host "Adding file $Filename to database"

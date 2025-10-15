@@ -344,38 +344,32 @@ function Download-Metadata-From-User {
 					if ($Response.results -and $Response.results.Count -gt 0) {
 						Write-Host "Number of results found: $($Response.results.Count)" -ForegroundColor Green
 ########################################################
-						#files
-						$stopwatchCursor = [System.Diagnostics.Stopwatch]::StartNew()
-						$sqlScript = "BEGIN TRANSACTION; " 
-						foreach ($File in $Response.results) {
-							$DeviationID = $File.deviationid
-							$FileTitle = $File.title
-######################################################## Skip locked content
-							$Continue = $false
-							#tiers
-							#object exists in json response
-							if ($File.PSObject.Properties['tier_access']) {
-								$TierAcess = $File.tier_access
-								#locked, skip
-								if ($TierAcess = "locked") {
-									$Continue = $false
-									Write-Host "File $DeviationID ($FileTitle) belongs to a tier that is locked from your account. Skipping..." -ForegroundColor Yellow
-								} else {
-								#not locked
-									$Continue = $true
+						# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+						$existingFileIDs = [System.Collections.Generic.HashSet[string]]::new()
+						$temp_query = "SELECT deviationID FROM Files WHERE username = '$Username';"
+						$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+							if ($result.Count -gt 0) {
+								foreach ($row in $result) {
+									$null = $existingFileIDs.Add($row.deviationID)
 								}
-							} else {
-								$Continue = $true
 							}
-########################################################
-							if ($Continue) {
-								#premium folders
-								if ($File.PSObject.Properties['premium_folder_data']) {
-									$PremiumAccess = $File.premium_folder_data.has_access
-									#no access, skip
-									if ($PremiumAccess = "false") {
+
+							#files
+							$stopwatchCursor = [System.Diagnostics.Stopwatch]::StartNew()
+							$sqlScript = "BEGIN TRANSACTION; " 
+							foreach ($File in $Response.results) {
+								$DeviationID = $File.deviationid
+								$FileTitle = $File.title
+######################################################## Skip locked content
+								$Continue = $false
+								#tiers
+								#object exists in json response
+								if ($File.PSObject.Properties['tier_access']) {
+									$TierAcess = $File.tier_access
+									#locked, skip
+									if ($TierAcess = "locked") {
 										$Continue = $false
-										Write-Host "File $DeviationID ($FileTitle) belongs to a premium folder that is locked from your account. Skipping..." -ForegroundColor Yellow
+										Write-Host "File $DeviationID ($FileTitle) belongs to a tier that is locked from your account. Skipping..." -ForegroundColor Yellow
 									} else {
 									#not locked
 										$Continue = $true
@@ -385,25 +379,35 @@ function Download-Metadata-From-User {
 								}
 ########################################################
 								if ($Continue) {
-######################################################## Filter
-									$Continue = $false
-									# check title
-									$result = Check-WordFilter -Content $FileTitle -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
-									# title passed the filter
-									if ($result) {
-										$Continue = $true
+									#premium folders
+									if ($File.PSObject.Properties['premium_folder_data']) {
+										$PremiumAccess = $File.premium_folder_data.has_access
+										#no access, skip
+										if ($PremiumAccess = "false") {
+											$Continue = $false
+											Write-Host "File $DeviationID ($FileTitle) belongs to a premium folder that is locked from your account. Skipping..." -ForegroundColor Yellow
+										} else {
+										#not locked
+											$Continue = $true
+										}
 									} else {
-										Write-Host "File $DeviationID ($FileTitle) failed the title word filter." -ForegroundColor Yellow
+										$Continue = $true
 									}
 ########################################################
 									if ($Continue) {
-										$temp_query = "SELECT EXISTS(SELECT 1 from Files WHERE deviationid = '$DeviationID');"
-										$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-										
-										# Extract the value from the result object
-										$exists = $result."EXISTS(SELECT 1 from Files WHERE deviationid = '$DeviationID')"
-				
-										if ($exists -eq 1) {
+######################################################## Filter
+										$Continue = $false
+										# check title
+										$result = Check-WordFilter -Content $FileTitle -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
+										# title passed the filter
+										if ($result) {
+											$Continue = $true
+										} else {
+											Write-Host "File $DeviationID ($FileTitle) failed the title word filter." -ForegroundColor Yellow
+										}
+########################################################
+										if ($Continue) {
+											if ($existingFileIDs.Contains($DeviationID)) {
 											Write-Host "File $DeviationID ($FileTitle) already exists in database, skipping..." -ForegroundColor Yellow
 											$CurrentSkips++
 											

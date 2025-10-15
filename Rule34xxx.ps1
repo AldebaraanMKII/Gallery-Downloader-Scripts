@@ -216,76 +216,88 @@ function Download-Metadata-From-Query {
 ############################################
 	}
 ############################################
-	if ($ContinueFetching) {
-		$HasMoreFiles = $true
-		Write-Host "`nFetching metadata for query $QueryName..." -ForegroundColor Yellow
-############################################
-		# Loop through pages of Files for the user
-		
-		$CurrentSkips = 0
-		while ($HasMoreFiles) {
-			$retryCount = 0
-			while ($retryCount -lt $maxRetries) {
-				
-				# https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit=1000&pid=200&tags=*huge_breasts%20-anthro*
-				# $URL = "$($BaseURL)&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
-                $URL = "$($BaseURL)&api_key=$API_Key&user_id=$UserID&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
-				$ConsoleURL = "$($BaseURL)&api_key=API_Key_Here&user_id=UserID_Here&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
-                
-				Write-Host "`nURL: $ConsoleURL" -ForegroundColor Yellow
-				
-				Write-Host "Fetching metadata for page $Page..." -ForegroundColor Yellow
-############################################
-				try {
-					
-					$sqlScript = "BEGIN TRANSACTION; "  # Using transactions reduced query apply time by 14-16 times
-					
-					if (-not $stopwatchBatch.IsRunning) {
-						$stopwatchBatch = [System.Diagnostics.Stopwatch]::StartNew() 
-					}
-					
-					# Make the API request and process the JSON response
-					$Response = Invoke-RestMethod -Uri $URL -Method Get
-					
-					# Parse the XML response 
-					$xml = [xml]$Response
-					
-############################################
-					# Check if there are any Files returned in the response
-					# if ($Response -and $Response.Count -gt 0) {
-					if ($xml.posts.post -ne $null) {
-						# Write-Host "Number of items: $($Response.Count)" -ForegroundColor Green
-						Write-Host "Number of items: $($xml.posts.post.Count)" -ForegroundColor Green
-						$CurItemCount = $xml.posts.post.Count
-						$i = 0
-						# this is to account for those times that the returned items are less than $MetadataCountBeforeAdding
-						# if ($Response.Count -lt $MetadataCountBeforeAdding) {
-							# $MetadataCountBeforeAdding = $Response.Count
-							# Write-Host "Set MetadataCountBeforeAdding to $($Response.Count)."
-						# }
-############################################
-						# $i = 0
-						#list to compare IDs to avoid duplicates
-						$HashList = New-Object System.Collections.Generic.List[System.Object]
-						# foreach ($File in $Response) {
-						foreach ($File in $xml.posts.post) {
-							$CurItemCount--
-							$i++
-							# Write-Host "CurItemCount is $CurItemCount"
-							# Write-Host "i is $i"
-							# id, filename_and_hash, extension, url, createdAt, artist_tag, downloaded favorite
-							$FileID = $File.id
-							
-							$Continue = $false
-							if ($SkipIDCheck -eq $false) {
-############################################
-								$temp_query = "SELECT EXISTS(SELECT 1 FROM Files WHERE id = '$FileID');"
-								$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-								
-								# Extract the value from the result object
-								$exists = $result."EXISTS(SELECT 1 FROM Files WHERE id = '$FileID')"
+		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+		$existingFileIDs = [System.Collections.Generic.HashSet[int]]::new()
 
-								if ($exists -eq 1) {
+		if ($ContinueFetching) {
+			$HasMoreFiles = $true
+			Write-Host "`nFetching metadata for query $QueryName..." -ForegroundColor Yellow
+############################################
+			# Loop through pages of Files for the user
+			
+			$CurrentSkips = 0
+			while ($HasMoreFiles) {
+				$retryCount = 0
+				while ($retryCount -lt $maxRetries) {
+					
+					# https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit=1000&pid=200&tags=*huge_breasts%20-anthro*
+					# $URL = "$($BaseURL)&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
+					$URL = "$($BaseURL)&api_key=$API_Key&user_id=$UserID&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
+					$ConsoleURL = "$($BaseURL)&api_key=API_Key_Here&user_id=UserID_Here&limit=$Results_per_Page&pid=$Page&tags=$($Query)$($IDString)"
+					
+					Write-Host "`nURL: $ConsoleURL" -ForegroundColor Yellow
+					
+					Write-Host "Fetching metadata for page $Page..." -ForegroundColor Yellow
+############################################
+					try {
+						
+						$sqlScript = "BEGIN TRANSACTION; "  # Using transactions reduced query apply time by 14-16 times
+						
+						if (-not $stopwatchBatch.IsRunning) {
+							$stopwatchBatch = [System.Diagnostics.Stopwatch]::StartNew() 
+						}
+						
+						# Make the API request and process the JSON response
+						$Response = Invoke-RestMethod -Uri $URL -Method Get
+						
+						# Parse the XML response 
+						$xml = [xml]$Response
+						
+############################################
+						# Check if there are any Files returned in the response
+						# if ($Response -and $Response.Count -gt 0) {
+						if ($xml.posts.post -ne $null) {
+
+							# If we are starting a new query, fetch the first ID and populate the hash set with a range of IDs
+							if ($IDString -eq "") {
+								$first_id = $xml.posts.post[0].id
+								$min_id_range = $first_id - 1000
+								$max_id_range = $first_id + 1000
+								$temp_query = "SELECT id FROM Files WHERE id BETWEEN $min_id_range AND $max_id_range;"
+								$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+								if ($result.Count -gt 0) {
+									foreach ($row in $result) {
+										$null = $existingFileIDs.Add($row.id)
+									}
+								}
+							}
+
+							# Write-Host "Number of items: $($Response.Count)" -ForegroundColor Green
+							Write-Host "Number of items: $($xml.posts.post.Count)" -ForegroundColor Green
+							$CurItemCount = $xml.posts.post.Count
+							$i = 0
+							# this is to account for those times that the returned items are less than $MetadataCountBeforeAdding
+							# if ($Response.Count -lt $MetadataCountBeforeAdding) {
+								# $MetadataCountBeforeAdding = $Response.Count
+								# Write-Host "Set MetadataCountBeforeAdding to $($Response.Count)."
+							# }
+############################################
+							# $i = 0
+							#list to compare IDs to avoid duplicates
+							$HashList = New-Object System.Collections.Generic.List[System.Object]
+							# foreach ($File in $Response) {
+							foreach ($File in $xml.posts.post) {
+								$CurItemCount--
+								$i++
+								# Write-Host "CurItemCount is $CurItemCount"
+								# Write-Host "i is $i"
+								# id, filename_and_hash, extension, url, createdAt, artist_tag, downloaded favorite
+								$FileID = $File.id
+								
+								$Continue = $false
+								if ($SkipIDCheck -eq $false) {
+############################################
+									if ($existingFileIDs.Contains($FileID)) {
 									Write-Host "File ID $FileID already exists in database, skipping..." -ForegroundColor Yellow
 									$CurrentSkips++
 									# Write-Host "CurrentSkips: $CurrentSkips" -ForegroundColor Yellow
