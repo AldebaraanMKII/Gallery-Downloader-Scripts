@@ -214,6 +214,17 @@ function Download-Metadata-From-User {
 ############################################
 	if ($ContinueFetching) {
 		$CurrentSkips = 0
+		
+		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+		$existingFileIDs = [System.Collections.Generic.HashSet[int]]::new()
+		$temp_query = "SELECT id FROM Files WHERE username = '$Username';"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+		if ($result.Count -gt 0) {
+			foreach ($row in $result) {
+				$null = $existingFileIDs.Add($row.id)
+			}
+		}
+		
 		foreach ($Rating in $RatingList) {
 			$HasMoreFiles = $true
 ############################################
@@ -255,16 +266,6 @@ function Download-Metadata-From-User {
 						if ($Response.items -and $Response.items.Count -gt 0) {
 							Write-Host "Number of results found: $($Response.items.Count)" -ForegroundColor Green
 ############################################
-							# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
-							$existingFileIDs = [System.Collections.Generic.HashSet[int]]::new()
-							$temp_query = "SELECT id FROM Files WHERE username = '$Username';"
-							$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-							if ($result.Count -gt 0) {
-								foreach ($row in $result) {
-									$null = $existingFileIDs.Add($row.id)
-								}
-							}
-
 							#files
 							$stopwatchCursor = [System.Diagnostics.Stopwatch]::StartNew()
 							$sqlScript = "BEGIN TRANSACTION; " 
@@ -285,6 +286,9 @@ function Download-Metadata-From-User {
 									}
 ##########################################
 								} else {
+									#add to hashtable if it does not exist already
+									$existingFileIDs.Add($FileID) | Out-Null
+									
 									$FileUrlRaw = $File.url
 									
 									# $FileHash = $File.hash
@@ -338,10 +342,10 @@ function Download-Metadata-From-User {
 										$FileMeta_NegativePrompt = $FileMeta_NegativePrompt -replace "'", ""
 										
 										$temp_query = "INSERT INTO Files (id, filename, extension, width, height, url, createdAt, postId, username, rating, meta_size, meta_seed, meta_model, meta_steps, meta_prompt, meta_sampler, meta_cfgScale, meta_clip_skip, meta_hires_upscale, meta_hires_upscaler, meta_negativePrompt, meta_denoising_strength, downloaded)
-																VALUES ('$FileID', '$filename', '$extension', '$FileWidth', '$FileHeight', '$FileUrl', '$formattedDate', '$FilePostID', '$FileUsername', '$Rating', '$FileMeta_Size', '$FileMeta_Seed', '$FileMeta_Model', '$FileMeta_Steps', '$FileMeta_Prompt', '$FileMeta_Sampler', '$FileMeta_CFGScale', '$FileMeta_ClipSkip', '$FileMeta_HiresUpscale', '$FileMeta_HiresUpscaler', '$FileMeta_NegativePrompt', '$FileMeta_DenoisingStrength', 0);"
+															VALUES ('$FileID', '$filename', '$extension', '$FileWidth', '$FileHeight', '$FileUrl', '$formattedDate', '$FilePostID', '$FileUsername', '$Rating', '$FileMeta_Size', '$FileMeta_Seed', '$FileMeta_Model', '$FileMeta_Steps', '$FileMeta_Prompt', '$FileMeta_Sampler', '$FileMeta_CFGScale', '$FileMeta_ClipSkip', '$FileMeta_HiresUpscale', '$FileMeta_HiresUpscaler', '$FileMeta_NegativePrompt', '$FileMeta_DenoisingStrength', 0);"
 									} else {
 										$temp_query = "INSERT INTO Files (id, filename, extension, width, height, url, createdAt, postId, username, rating, downloaded)
-																VALUES ('$FileID', '$filename', '$extension', '$FileWidth', '$FileHeight', '$FileUrl', '$formattedDate', '$FilePostID', '$FileUsername', '$Rating', 0);"
+															VALUES ('$FileID', '$filename', '$extension', '$FileWidth', '$FileHeight', '$FileUrl', '$formattedDate', '$FilePostID', '$FileUsername', '$Rating', 0);"
 									}
 									
 									# Write-Host "`n$temp_query"
@@ -351,6 +355,7 @@ function Download-Metadata-From-User {
 									# Write-Host "TotalFiles is $TotalFiles."
 									Write-Host "Added FileID $FileID to database." -ForegroundColor Green
 								}
+##################################################
 							}
 ##################################################
 							# End the transaction

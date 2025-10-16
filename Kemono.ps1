@@ -291,7 +291,9 @@ function Download-Metadata-From-Creator {
 	}
 ########################################################
 ########################################################
-		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+		$CurrentSkips = 0
+########################################################
+		# Get all post IDs for the current user from the database and store them in a hash set for faster lookups
 		$existingPostIDs = [System.Collections.Generic.HashSet[string]]::new()
 		$temp_query = "SELECT postID FROM Posts WHERE creatorName = '$CreatorName';"
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -301,7 +303,16 @@ function Download-Metadata-From-Creator {
 			}
 		}
 
-		$CurrentSkips = 0
+		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+		$existingFileHashes = [System.Collections.Generic.HashSet[string]]::new()
+		$temp_query = "SELECT hash FROM Files WHERE creatorName = '$CreatorName';"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+		if ($result.Count -gt 0) {
+			foreach ($row in $result) {
+				$null = $existingFileHashes.Add($row.hash)
+			}
+		}
+########################################################
 		# Loop through pages of files for the user
 		while ($HasMoreFiles) {
 			$retryCount = 0
@@ -372,6 +383,9 @@ function Download-Metadata-From-Creator {
 									}
 ############################################
 								} else {
+									#add to hashtable
+									$existingPostIDs.Add($PostID) | Out-Null
+									
 									$stopwatchPost = [System.Diagnostics.Stopwatch]::StartNew() 
 									Write-Host "`n`nAdding post $PostTitle ($PostID) to database..." -ForegroundColor Green
 					 
@@ -416,24 +430,14 @@ function Download-Metadata-From-Creator {
 																VALUES ('$PostID', '$CreatorName', '$PostTitle', '$PostContent', '$PostDatePublishedFormatted', '$PostDateAddedFormatted', 0);"
 									# Write-Host "`n temp query from line 391 is $temp_query"
 									Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-############################################
-									# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
-									$existingFileHashes = [System.Collections.Generic.HashSet[string]]::new()
-									$temp_query = "SELECT hash FROM Files WHERE creatorName = '$CreatorName';"
-									$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-									if ($result.Count -gt 0) {
-										foreach ($row in $result) {
-											$null = $existingFileHashes.Add($row.hash)
-										}
-									}
-
+########################################################################################
 									#files
 									$stopwatchFile = [System.Diagnostics.Stopwatch]::StartNew()
 									$sqlScript = "BEGIN TRANSACTION; "
 									$Cur_Index = 0 	#start index at 0
 									#list to compare hashes to avoid duplicates
 									$HashList = New-Object System.Collections.Generic.List[System.Object]
-############################################
+########################################################################################
 									#process single file
 									if ($Post.file -and $Post.file.name) {
 										foreach ($File in $Post.file) {
@@ -457,12 +461,14 @@ function Download-Metadata-From-Creator {
 												$HashWithExtension = Split-Path -Path $FileURLRaw -Leaf
 												$FileHash, $FileExtension = $HashWithExtension -split '\.'
 											}
+########################################################################################
 											# check file extension
 											# Write-Host "Excluded file formats is $FormatList."
 											# Write-Host "File extension is $FileExtension."
 											if ($FormatList -notcontains $FileExtension) {
+########################################################################################
 												if ($HashList -notcontains $FileHash) {
-													$HashList.Add($FileHash)
+													$HashList.Add($FileHash) | Out-Null
 													#fix filename query errors
 													$Filename = $Filename -replace "'", "''"
 													
@@ -471,10 +477,12 @@ function Download-Metadata-From-Creator {
 													$HashWithExtension = Split-Path -Path $FileURLRaw -Leaf
 													# Split the filename and extension
 													$FileHash, $HashExtension = $HashWithExtension -split '\.'
-													
+########################################################################################
 													if ($existingFileHashes.Contains($FileHash)) {
 														Write-Host "File $Filename ($FileHash) already exists in database, skipping..." -ForegroundColor Yellow
-													}	else {
+													} else {
+														#add to hashtable
+														$existingFileHashes.Add($FileHash) | Out-Null
 														# Write-Host "Adding file $Filename to database"
 														
 														$FileURL = Split-Path -Path $FileURLRaw -Parent
@@ -488,13 +496,16 @@ function Download-Metadata-From-Creator {
 														# Write-Host "`n sqlScript query from line 429 is $sqlScript"
 														Write-Host "Added file $Filename ($FileHash) to database."  -ForegroundColor Green
 													}
+########################################################################################
 												}
+########################################################################################
 											} else {
 												Write-Host "Skipped file $FilenameRaw." -ForegroundColor Yellow
 											}
+########################################################################################
 										}
 									}
-############################################
+########################################################################################
 ############################################ #process attachments
 									if ($Post.attachments.Count -gt 0) {
 										Write-Host "Number of files (attachments): $($Post.attachments.Count)" -ForegroundColor Green

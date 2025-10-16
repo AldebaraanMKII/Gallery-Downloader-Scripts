@@ -259,18 +259,18 @@ function Download-Metadata-From-Query {
 						if ($xml.posts.post -ne $null) {
 
 							# If we are starting a new query, fetch the first ID and populate the hash set with a range of IDs
-							if ($IDString -eq "") {
-								$first_id = $xml.posts.post[0].id
-								$min_id_range = $first_id - 1000
-								$max_id_range = $first_id + 1000
-								$temp_query = "SELECT id FROM Files WHERE id BETWEEN $min_id_range AND $max_id_range;"
-								$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-								if ($result.Count -gt 0) {
-									foreach ($row in $result) {
-										$null = $existingFileIDs.Add($row.id)
-									}
+							# if ($IDString -eq "") {
+							$first_id = $xml.posts.post[0].id
+							$min_id_range = $first_id - 300
+							$max_id_range = $first_id + 1300
+							$temp_query = "SELECT id FROM Files WHERE id BETWEEN $min_id_range AND $max_id_range;"
+							$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+							if ($result.Count -gt 0) {
+								foreach ($row in $result) {
+									$null = $existingFileIDs.Add($row.id)
 								}
 							}
+							# }
 
 							# Write-Host "Number of items: $($Response.Count)" -ForegroundColor Green
 							Write-Host "Number of items: $($xml.posts.post.Count)" -ForegroundColor Green
@@ -298,46 +298,46 @@ function Download-Metadata-From-Query {
 								if ($SkipIDCheck -eq $false) {
 ############################################
 									if ($existingFileIDs.Contains($FileID)) {
-									Write-Host "File ID $FileID already exists in database, skipping..." -ForegroundColor Yellow
-									$CurrentSkips++
-									# Write-Host "CurrentSkips: $CurrentSkips" -ForegroundColor Yellow
+										Write-Host "File ID $FileID already exists in database, skipping..." -ForegroundColor Yellow
+										$CurrentSkips++
+										# Write-Host "CurrentSkips: $CurrentSkips" -ForegroundColor Yellow
 ############################################
-									if ($CurItemCount -le 0 -or $i -ge $MetadataCountBeforeAdding) {
-										$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-										#update last_id to the current $FileID
-										$temp_query = "UPDATE Queries SET last_id = '$FileID' WHERE query = '$Query' AND minID = $MinID AND maxID = $MaxID;"
-										$sqlScript += $temp_query + " "
-										# End the transaction
-										$sqlScript += "COMMIT;"  
-										#execute all queries at once
-										# Write-Host "$sqlScript"
-										Write-Host "Executing queries..." -ForegroundColor Yellow
-										Invoke-SqliteQuery -DataSource $DBFilePath -Query $sqlScript
-										
-										$stopwatch.Stop()
-										Write-Host "Queries applied in $($stopwatch.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-										Write-Host "`n"
-										
-										$sqlScript = "BEGIN TRANSACTION; "  # Using transactions reduced query apply time by 14-16 times
-										$i = 0 		#reset it
-										
-									}
+										if ($CurItemCount -le 0 -or $i -ge $MetadataCountBeforeAdding) {
+											$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+											#update last_id to the current $FileID
+											$temp_query = "UPDATE Queries SET last_id = '$FileID' WHERE query = '$Query' AND minID = $MinID AND maxID = $MaxID;"
+											$sqlScript += $temp_query + " "
+											# End the transaction
+											$sqlScript += "COMMIT;"  
+											#execute all queries at once
+											# Write-Host "$sqlScript"
+											Write-Host "Executing queries..." -ForegroundColor Yellow
+											Invoke-SqliteQuery -DataSource $DBFilePath -Query $sqlScript
+											
+											$stopwatch.Stop()
+											Write-Host "Queries applied in $($stopwatch.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+											Write-Host "`n"
+											
+											$sqlScript = "BEGIN TRANSACTION; "  # Using transactions reduced query apply time by 14-16 times
+											$i = 0 		#reset it
+											
+										}
 ############################################
-									if ($CurrentSkips -gt $MaxSkipsBeforeAborting) {
-										Write-Host "Reached maximum amount of skipped items. Skipping query..." -ForegroundColor Yellow
-										$HasMoreFiles = $false
-										# $CurrentSkips = 0
-										break
-									}
+										if ($CurrentSkips -gt $MaxSkipsBeforeAborting) {
+											Write-Host "Reached maximum amount of skipped items. Skipping query..." -ForegroundColor Yellow
+											$HasMoreFiles = $false
+											# $CurrentSkips = 0
+											break
+										}
 ############################################
 								} else {
+									$existingFileIDs.Add($FileID)
 									$Continue = $true
 								}
 ############################################
 							} else {
 								$Continue = $true
 							}
-							
 ############################################ code to avoid duplicates
 							if ($HashList -notcontains $FileID) {
 								$HashList.Add($FileID)

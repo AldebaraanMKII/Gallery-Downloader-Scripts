@@ -306,6 +306,17 @@ function Download-Metadata-From-User {
 	}
 ########################################################
 	$CurrentSkips = 0
+	
+	# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+	$existingFileIDs = [System.Collections.Generic.HashSet[string]]::new()
+	$temp_query = "SELECT deviationID FROM Files WHERE username = '$Username';"
+	$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+	if ($result.Count -gt 0) {
+		foreach ($row in $result) {
+			$null = $existingFileIDs.Add($row.deviationID)
+		}
+	}
+		
 	if ($ContinueFetching) {
 		$HasMoreFiles = $true
 ########################################################
@@ -344,16 +355,6 @@ function Download-Metadata-From-User {
 					if ($Response.results -and $Response.results.Count -gt 0) {
 						Write-Host "Number of results found: $($Response.results.Count)" -ForegroundColor Green
 ########################################################
-						# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
-						$existingFileIDs = [System.Collections.Generic.HashSet[string]]::new()
-						$temp_query = "SELECT deviationID FROM Files WHERE username = '$Username';"
-						$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-							if ($result.Count -gt 0) {
-								foreach ($row in $result) {
-									$null = $existingFileIDs.Add($row.deviationID)
-								}
-							}
-
 							#files
 							$stopwatchCursor = [System.Diagnostics.Stopwatch]::StartNew()
 							$sqlScript = "BEGIN TRANSACTION; " 
@@ -421,6 +422,9 @@ function Download-Metadata-From-User {
 											}
 ########################################################
 										} else {
+											#add to hashtable if it does not exist already
+											$existingFileIDs.Add($DeviationID) | Out-Null
+											
 											$FileUrlRaw = $File.url
 											# "https://www.deviantart.com/$($Username)/art/$($URL)"
 											$FileUrl = $FileUrlRaw -replace "https://www.deviantart.com/$($Username)/art/", ''
