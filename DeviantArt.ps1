@@ -310,7 +310,7 @@ function Download-Metadata-From-User {
 	# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
 	$existingFileIDs = [System.Collections.Generic.HashSet[string]]::new() 
 	# $temp_query = "SELECT deviationID FROM Files WHERE username = '$Username';"
-	$temp_query = "SELECT deviationID FROM Files WHERE UPPER(username) = UPPER ('$Username');" #case insensitive
+	$temp_query = "SELECT deviationID FROM Files WHERE UPPER(username) = UPPER('$Username');" #case insensitive
 	$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
 	if ($result.Count -gt 0) {
 		foreach ($row in $result) {
