@@ -130,7 +130,7 @@ function Download-Metadata-From-User {
 	$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 	$exists = $result."EXISTS(SELECT 1 from Users WHERE username = '$Username')"
 ########################################################
-	# Check the result
+	# Does not exist
 	if ($exists -eq 0) {
 ################## Check and retrieve access token
 		$AccessCodeExpired = Check-if-Access-Token-Expired
@@ -307,18 +307,19 @@ function Download-Metadata-From-User {
 ########################################################
 	$CurrentSkips = 0
 	
-	# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
-	$existingFileIDs = [System.Collections.Generic.HashSet[string]]::new() 
-	# $temp_query = "SELECT deviationID FROM Files WHERE username = '$Username';"
-	$temp_query = "SELECT deviationID FROM Files WHERE UPPER(username) = UPPER('$Username');" #case insensitive
-	$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-	if ($result.Count -gt 0) {
-		foreach ($row in $result) {
-			$null = $existingFileIDs.Add($row.deviationID)
-		}
-	}
-		
 	if ($ContinueFetching) {
+########################################################
+		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+		$existingFileIDs = [System.Collections.Generic.HashSet[string]]::new() 
+		# $temp_query = "SELECT deviationID FROM Files WHERE username = '$Username';"
+		$temp_query = "SELECT deviationID FROM Files WHERE UPPER(username) = UPPER('$Username');" #case insensitive
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+		if ($result.Count -gt 0) {
+			foreach ($row in $result) {
+				$null = $existingFileIDs.Add($row.deviationID)
+			}
+		}
+########################################################
 		$HasMoreFiles = $true
 ########################################################
 		# Loop through pages of images for the user

@@ -293,24 +293,25 @@ function Download-Metadata-From-Creator {
 ########################################################
 		$CurrentSkips = 0
 ########################################################
-		# Get all post IDs for the current user from the database and store them in a hash set for faster lookups
-		$existingPostIDs = [System.Collections.Generic.HashSet[string]]::new()
-		$temp_query = "SELECT postID FROM Posts WHERE UPPER(creatorName) = UPPER('$CreatorName');"
-		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-		if ($result.Count -gt 0) {
-			foreach ($row in $result) {
-				$null = $existingPostIDs.Add($row.postID)
+		if ($HasMoreFiles) {
+			# Get all post IDs for the current user from the database and store them in a hash set for faster lookups
+			$existingPostIDs = [System.Collections.Generic.HashSet[string]]::new()
+			$temp_query = "SELECT postID FROM Posts WHERE UPPER(creatorName) = UPPER('$CreatorName');"
+			$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+			if ($result.Count -gt 0) {
+				foreach ($row in $result) {
+					$null = $existingPostIDs.Add($row.postID)
+				}
 			}
-		}
-		
- = 
-		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
-		$existingFileHashes = [System.Collections.Generic.HashSet[string]]::new()
-		$temp_query = "SELECT hash FROM Files WHERE UPPER(creatorName) = UPPER('$CreatorName');"
-		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-		if ($result.Count -gt 0) {
-			foreach ($row in $result) {
-				$null = $existingFileHashes.Add($row.hash)
+########################################################
+			# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
+			$existingFileHashes = [System.Collections.Generic.HashSet[string]]::new()
+			$temp_query = "SELECT hash FROM Files WHERE UPPER(creatorName) = UPPER('$CreatorName');"
+			$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+			if ($result.Count -gt 0) {
+				foreach ($row in $result) {
+					$null = $existingFileHashes.Add($row.hash)
+				}
 			}
 		}
 ########################################################
