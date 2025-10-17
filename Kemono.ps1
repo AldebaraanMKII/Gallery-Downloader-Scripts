@@ -428,10 +428,11 @@ function Download-Metadata-From-Creator {
 									# "published": "2024-08-26T23:13:16",
 									# "edited": "2024-08-26T23:13:16",
 									
-									$temp_query = "INSERT INTO Posts (postID, creatorName, title, content, date_published, date_added, downloaded) 
-																VALUES ('$PostID', '$CreatorName', '$PostTitle', '$PostContent', '$PostDatePublishedFormatted', '$PostDateAddedFormatted', 0);"
-									# Write-Host "`n temp query from line 391 is $temp_query"
-									Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+									#added below
+									####$temp_query = "INSERT INTO Posts (postID, creatorName, title, content, date_published, date_added, downloaded) 
+									####							VALUES ('$PostID', '$CreatorName', '$PostTitle', '$PostContent', '$PostDatePublishedFormatted', '$PostDateAddedFormatted', 0);"
+									##### Write-Host "`n temp query from line 391 is $temp_query"
+									####Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 ########################################################################################
 									#files
 									$stopwatchFile = [System.Diagnostics.Stopwatch]::StartNew()
@@ -587,6 +588,12 @@ function Download-Metadata-From-Creator {
 									# Write-Host "`nExecuting queries..."
 									# Write-Host "`n sqlScript query from line 443 is $sqlScript"
 									Invoke-SqliteQuery -DataSource $DBFilePath -Query $sqlScript
+									
+############################################ Now add the post itself. This is to prevent a post being skipped if for whatever reason the files for that post didn't get added fully
+									$temp_query = "INSERT INTO Posts (postID, creatorName, title, content, date_published, date_added, downloaded) 
+																VALUES ('$PostID', '$CreatorName', '$PostTitle', '$PostContent', '$PostDatePublishedFormatted', '$PostDateAddedFormatted', 0);"
+									# Write-Host "`n temp query from line 391 is $temp_query"
+									Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 ############################################ update total_files for this post
 									$temp_query = "UPDATE Posts SET total_files = '$Cur_Index' WHERE postID = '$PostID'"
 									Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
@@ -598,7 +605,6 @@ function Download-Metadata-From-Creator {
 									Write-Host "Fetched metadata for post $($PostID) in $($stopwatchPost.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 								}
 							}
-							
 ############################################
 						}
 ############################################
