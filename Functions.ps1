@@ -458,6 +458,27 @@ function Create-Filename {
 		$FileURL = $row.url
 		$FileIndex = $row.file_index
 		$FileCreatorName = $row.creatorName
+		$PostID = $row.postID
+		
+		#empty initially
+		$PostTitle = "unknown"
+		$PostDatePublished = "unknown"
+		$PostDatePublishedFormatted = "unknown"
+		$PostDatePublishedFormattedShort = "unknown"
+		$PostTotalFiles = "unknown"
+		
+		$query = "SELECT title, date_published, total_files FROM Posts WHERE postID = '$PostID';"
+		$results = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $query
+			
+		if ($results.Count -gt 0) {
+			$PostTitle = $results[0].title
+			$PostDatePublished = $results[0].date_published
+			
+			$PostDatePublishedFormatted = [datetime]::ParseExact($PostDatePublished, "yyyy-MM-dd HH:mm:ss", $null).ToString("yyyy-MM-dd HH-mm-ss")
+			$PostDatePublishedFormattedShort = [datetime]::ParseExact($PostDatePublished, "yyyy-MM-dd HH:mm:ss", $null).ToString("yyyy-MM-dd")
+			
+			$PostTotalFiles = $results[0].total_files
+		}
 		
 		#shorten length due to windows 255 character limit
 		if ($FileFilename.Length -gt 100) {
