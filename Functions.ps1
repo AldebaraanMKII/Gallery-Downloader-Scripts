@@ -148,9 +148,7 @@ function Convert-File {
 										Write-Error "Error during conversion: $($_.Exception.Message)"
 									}
 								
-						}
- -ArgumentList $FilePath, $FileName, $ConvertFileType, $ConvertFileCommands, $Folder, $SaveConvertedFileSubfolder, $RemoveOriginalFileAfterConversion *> $null
-
+														} -ArgumentList $FilePath, $FileName, $ConvertFileType, $ConvertFileCommands, $Folder, $SaveConvertedFileSubfolder, $RemoveOriginalFileAfterConversion *> $null
 								break
 					}
 ########################################################
@@ -459,7 +457,6 @@ function Create-Filename {
 		$FileFilenameExtension = $row.filename_extension
 		$FileURL = $row.url
 		$FileIndex = $row.file_index
-		$FileCreatorID = $row.creatorID
 		$FileCreatorName = $row.creatorName
 		
 		#shorten length due to windows 255 character limit
@@ -472,8 +469,7 @@ function Create-Filename {
 		# Write-Host "Filename: $Filename"
 		
 		# Replace placeholders with actual values
-		$Filename = $FilenameTemplate -replace '%CreatorID%', $FileCreatorID `
-									-replace '%CreatorName%', $FileCreatorName `
+		$Filename = $FilenameTemplate -replace '%CreatorName%', $FileCreatorName `
 									-replace '%PostID%', $PostID `
 									-replace '%PostTitle%', $PostTitle `
 									-replace '%PostPublishDate%', $PostDatePublishedFormatted `
