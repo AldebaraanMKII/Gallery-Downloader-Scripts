@@ -90,7 +90,7 @@ function Download-Files-From-Database {
 							# Replace invalid characters with an empty string
 							$PostTitleFilename = $PostTitle -replace "[$invalidChars]", ''
 							
-							$temp_query = "SELECT hash, hash_extension, filename, filename_extension, url, file_index, creatorID, creatorName FROM Files WHERE postID = '$PostID' AND downloaded = 0;"
+							$temp_query = "SELECT postID, hash, hash_extension, filename, filename_extension, url, file_index, creatorID, creatorName FROM Files WHERE postID = '$PostID' AND downloaded = 0;"
 					
 							$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
 #########################################
@@ -125,7 +125,7 @@ function Download-Files-From-Database {
 	} elseif ($Type -eq 2) {
 		$WhereQuery = $(Write-Host "`nEnter WHERE query:" -ForegroundColor cyan -NoNewLine; Read-Host)
 		
-		$temp_query = "SELECT creatorName, hash, hash_extension, filename, filename_extension, url, file_index, creatorID  FROM Files $WhereQuery;"
+		$temp_query = "SELECT postID, creatorName, hash, hash_extension, filename, filename_extension, url, file_index  FROM Files $WhereQuery;"
 
 		# Write-Host "temp_query: $temp_query" -ForegroundColor Yellow
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
