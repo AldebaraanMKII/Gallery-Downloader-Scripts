@@ -667,8 +667,6 @@ function Process-Queries {
 	
 		Download-Metadata-From-Query -QueryName $QueryName -MinID $MinID -MaxID $MaxID -Results_per_Page $Results_per_Page -Query $Query
 	}
-	
-	Download-Files-From-Database -Type 1
 }
 ############################################
 function Graphical-Options {
