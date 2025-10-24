@@ -130,10 +130,10 @@ function Download-Metadata-From-User {
 	$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 	$exists = $result."EXISTS(SELECT 1 from Users WHERE username = '$Username')"
 ########################################################
-	# Does not exist
+	# Check the result
 	if ($exists -eq 0) {
 ################## Check and retrieve access token
-		$AccessCodeExpired = Check-if-Access-Token-Expired
+		  $AccessCodeExpired = Check-if-Access-Token-Expired
 		if ($AccessCodeExpired) {
 			Write-Host "Access token expired. Requesting a new one..." -ForegroundColor Yellow
 			# $Access_Token = Refresh-Access-Token
@@ -214,7 +214,7 @@ function Download-Metadata-From-User {
 	} else {
 		Write-Host "`nFound user $Username in database." -ForegroundColor Green
 ################## Check and retrieve access token
-		$AccessCodeExpired = Check-if-Access-Token-Expired
+		  $AccessCodeExpired = Check-if-Access-Token-Expired
 		if ($AccessCodeExpired) {
 			Write-Host "Access token expired. Requesting a new one..." -ForegroundColor Yellow
 			# $Access_Token = Refresh-Access-Token
@@ -246,7 +246,7 @@ function Download-Metadata-From-User {
 					$ContinueFetching = $false
 					Write-Host "This user was updated less than $TimeToCheckAgainMetadata hours ago. Skipping..." -ForegroundColor Yellow
 ########################################################
-				} else {
+				}	else {
 					$URL = "https://www.deviantart.com/api/v1/oauth2/user/profile/$($Username)?ext_collections=1&ext_galleries=1&access_token=$Access_Token"
 					# Make the API request and process the JSON response
 					
@@ -306,20 +306,7 @@ function Download-Metadata-From-User {
 	}
 ########################################################
 	$CurrentSkips = 0
-	
 	if ($ContinueFetching) {
-########################################################
-		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
-		$existingFileIDs = [System.Collections.Generic.HashSet[string]]::new() 
-		# $temp_query = "SELECT deviationID FROM Files WHERE username = '$Username';"
-		$temp_query = "SELECT deviationID FROM Files WHERE UPPER(username) = UPPER('$Username');" #case insensitive
-		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-		if ($result.Count -gt 0) {
-			foreach ($row in $result) {
-				$null = $existingFileIDs.Add($row.deviationID)
-			}
-		}
-########################################################
 		$HasMoreFiles = $true
 ########################################################
 		# Loop through pages of images for the user
@@ -357,22 +344,38 @@ function Download-Metadata-From-User {
 					if ($Response.results -and $Response.results.Count -gt 0) {
 						Write-Host "Number of results found: $($Response.results.Count)" -ForegroundColor Green
 ########################################################
-							#files
-							$stopwatchCursor = [System.Diagnostics.Stopwatch]::StartNew()
-							$sqlScript = "BEGIN TRANSACTION; " 
-							foreach ($File in $Response.results) {
-								$DeviationID = $File.deviationid
-								$FileTitle = $File.title
+						#files
+						$stopwatchCursor = [System.Diagnostics.Stopwatch]::StartNew()
+						$sqlScript = "BEGIN TRANSACTION; " 
+						foreach ($File in $Response.results) {
+							$DeviationID = $File.deviationid
+							$FileTitle = $File.title
 ######################################################## Skip locked content
-								$Continue = $false
-								#tiers
-								#object exists in json response
-								if ($File.PSObject.Properties['tier_access']) {
-									$TierAcess = $File.tier_access
-									#locked, skip
-									if ($TierAcess -eq "locked") {
+							$Continue = $false
+							#tiers
+							#object exists in json response
+							if ($File.PSObject.Properties['tier_access']) {
+								$TierAcess = $File.tier_access
+								#locked, skip
+								if ($TierAcess = "locked") {
+									$Continue = $false
+									Write-Host "File $DeviationID ($FileTitle) belongs to a tier that is locked from your account. Skipping..." -ForegroundColor Yellow
+								} else {
+								#not locked
+									$Continue = $true
+								}
+							} else {
+								$Continue = $true
+							}
+########################################################
+							if ($Continue) {
+								#premium folders
+								if ($File.PSObject.Properties['premium_folder_data']) {
+									$PremiumAccess = $File.premium_folder_data.has_access
+									#no access, skip
+									if ($PremiumAccess = "false") {
 										$Continue = $false
-										Write-Host "File $DeviationID ($FileTitle) belongs to a tier that is locked from your account. Skipping..." -ForegroundColor Yellow
+										Write-Host "File $DeviationID ($FileTitle) belongs to a premium folder that is locked from your account. Skipping..." -ForegroundColor Yellow
 									} else {
 									#not locked
 										$Continue = $true
@@ -382,177 +385,164 @@ function Download-Metadata-From-User {
 								}
 ########################################################
 								if ($Continue) {
-									#premium folders
-									if ($File.PSObject.Properties['premium_folder_data']) {
-										$PremiumAccess = $File.premium_folder_data.has_access
-										#no access, skip
-										if ($PremiumAccess -eq "false") {
-											$Continue = $false
-											Write-Host "File $DeviationID ($FileTitle) belongs to a premium folder that is locked from your account. Skipping..." -ForegroundColor Yellow
-										} else {
-											#not locked
-											$Continue = $true
-										}
-									} else {
+######################################################## Filter
+									$Continue = $false
+									# check title
+									$result = Check-WordFilter -Content $FileTitle -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
+									# title passed the filter
+									if ($result) {
 										$Continue = $true
+									} else {
+										Write-Host "File $DeviationID ($FileTitle) failed the title word filter." -ForegroundColor Yellow
 									}
 ########################################################
 									if ($Continue) {
-######################################################## Filter
-										$Continue = $false
-										# check title
-										$result = Check-WordFilter -Content $FileTitle -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
-										# title passed the filter
-										if ($result) {
-											$Continue = $true
-										} else {
-											Write-Host "File $DeviationID ($FileTitle) failed the title word filter." -ForegroundColor Yellow
-										}
-########################################################
-										if ($Continue) {
-											if ($existingFileIDs.Contains($DeviationID)) {
-												Write-Host "File $DeviationID ($FileTitle) already exists in database, skipping..." -ForegroundColor Yellow
-												$CurrentSkips++
+										$temp_query = "SELECT EXISTS(SELECT 1 from Files WHERE deviationid = '$DeviationID');"
+										$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+										
+										# Extract the value from the result object
+										$exists = $result."EXISTS(SELECT 1 from Files WHERE deviationid = '$DeviationID')"
+				
+										if ($exists -eq 1) {
+											Write-Host "File $DeviationID ($FileTitle) already exists in database, skipping..." -ForegroundColor Yellow
+											$CurrentSkips++
 											
-												if ($MaxSkipsBeforeAborting -gt 0) {
-													if ($CurrentSkips -gt $MaxSkipsBeforeAborting) {
-														Write-Host "Reached maximum amount of skipped items. Skipping user $Username" -ForegroundColor Yellow
-														$HasMoreFiles = $false
-														# $CurrentSkips = 0
-														break
-													}
+											if ($MaxSkipsBeforeAborting -gt 0) {
+												if ($CurrentSkips -gt $MaxSkipsBeforeAborting) {
+													Write-Host "Reached maximum amount of skipped items. Skipping user $Username" -ForegroundColor Yellow
+													$HasMoreFiles = $false
+													# $CurrentSkips = 0
+													break
 												}
+											}
 ########################################################
-											} else {
-												#add to hashtable if it does not exist already
-												$existingFileIDs.Add($DeviationID) | Out-Null
-												
-												$FileUrlRaw = $File.url
-												# "https://www.deviantart.com/$($Username)/art/$($URL)"
-												$FileUrl = $FileUrlRaw -replace "https://www.deviantart.com/$($Username)/art/", ''
-												
-												$FileHeight = $File.content.height
-												$FileWidth = $File.content.width
-												$FileUsername = $File.author.username
-												
-												#fix backtick issues
-												$FileTitle = $FileTitle -replace "'", "''"
-												
-												$FilePublishedTimeRaw = $File.published_time     #Unix time
-												# Convert to DateTime
-												$FilePublishedTime = [System.DateTime]::UnixEpoch.AddSeconds($FilePublishedTimeRaw).ToString("yyyy-MM-dd HH:mm:ss")
-												
-												# Write-Output "`nFileSrcURLRaw: $FileSrcURLRaw"
+										} else {
+											$FileUrlRaw = $File.url
+											# "https://www.deviantart.com/$($Username)/art/$($URL)"
+											$FileUrl = $FileUrlRaw -replace "https://www.deviantart.com/$($Username)/art/", ''
+											
+											$FileHeight = $File.content.height
+											$FileWidth = $File.content.width
+											$FileUsername = $File.author.username
+											
+											#fix backtick issues
+											$FileTitle = $FileTitle -replace "'", "''"
+											
+											$FilePublishedTimeRaw = $File.published_time     #Unix time
+											# Convert to DateTime
+											$FilePublishedTime = [System.DateTime]::UnixEpoch.AddSeconds($FilePublishedTimeRaw).ToString("yyyy-MM-dd HH:mm:ss")
+											
+											# Write-Output "`nFileSrcURLRaw: $FileSrcURLRaw"
 ########################################################
-												#process images and videos differently
-												#images
-												if ($File.PSObject.Properties['content']) {
-													# Write-Output "Found image"
-													$FileSrcURLRaw = $File.content.src
-													#remove this to save some database space
-													$FileSrcURL = $FileSrcURLRaw -replace "https://images-wixmp-", ""
-													
+											#process images and videos differently
+											#images
+											if ($File.PSObject.Properties['content']) {
+												# Write-Output "Found image"
+												$FileSrcURLRaw = $File.content.src
+												#remove this to save some database space
+												$FileSrcURL = $FileSrcURLRaw -replace "https://images-wixmp-", ""
+												
 ######################################################## Things from this point foward improve image quality
-													$FileSrcURL = $FileSrcURL -replace ",q_\d{1,3}", ",q_100"	#any number between 1 and 3 digits is replaced with q_100
-													
-													#This will replace lower quality jpg/jpeg with png if available
-													# Extract first and last file types using regex
-													$firstFileType = [regex]::Match($FileSrcURL, "\.(bmp|png|jpg|jpeg|webp|avif|gif)").Value
-													$lastFileType = [regex]::Match($FileSrcURL, "\.(bmp|png|jpg|jpeg|webp|avif|gif)(?=\?|$)").Value
-													
-													$FileExtension = $firstFileType
-													# Check if they are different
-													if ($firstFileType -ne $lastFileType) {
-														# Replace the last file type with the first
-														$FileSrcURL = $FileSrcURL -replace [regex]::Escape($lastFileType), $firstFileType
-														# Write-Host "Updated string: $FileSrcURL" -ForegroundColor Green
-													}
+												$FileSrcURL = $FileSrcURL -replace ",q_\d{1,3}", ",q_100"	#any number between 1 and 3 digits is replaced with q_100
+												
+												#This will replace lower quality jpg/jpeg with png if available
+												# Extract first and last file types using regex
+												$firstFileType = [regex]::Match($FileSrcURL, "\.(bmp|png|jpg|jpeg|webp|avif|gif)").Value
+												$lastFileType = [regex]::Match($FileSrcURL, "\.(bmp|png|jpg|jpeg|webp|avif|gif)(?=\?|$)").Value
+												
+												$FileExtension = $firstFileType
+												# Check if they are different
+												if ($firstFileType -ne $lastFileType) {
+													# Replace the last file type with the first
+													$FileSrcURL = $FileSrcURL -replace [regex]::Escape($lastFileType), $firstFileType
+													# Write-Host "Updated string: $FileSrcURL" -ForegroundColor Green
+												}
 ######################################################## Image quality improvements end
-													$temp_query = "INSERT INTO Files (deviationID, url, src_url, extension, height, width, title, username, published_time)
-																				VALUES ('$DeviationID', '$FileUrl', '$FileSrcURL', '$FileExtension', '$FileHeight', '$FileWidth', '$FileTitle', '$FileUsername', '$FilePublishedTime');"
-					
-													# Write-Host "`n$temp_query"
-													$sqlScript += $temp_query + " "
-													
-													Write-Host "Added File $DeviationID ($FileTitle) ($FileExtension) to database." -ForegroundColor Green
+												$temp_query = "INSERT INTO Files (deviationID, url, src_url, extension, height, width, title, username, published_time)
+																			VALUES ('$DeviationID', '$FileUrl', '$FileSrcURL', '$FileExtension', '$FileHeight', '$FileWidth', '$FileTitle', '$FileUsername', '$FilePublishedTime');"
+				
+												# Write-Host "`n$temp_query"
+												$sqlScript += $temp_query + " "
+												
+												Write-Host "Added File $DeviationID ($FileTitle) ($FileExtension) to database." -ForegroundColor Green
 ################################################################################
-												#videos
-												} elseif ($File.PSObject.Properties['videos']) {
-													# Write-Output "Found video"
-													#get the highest quality video
-													$highestResolutionVideo = $File.videos | Sort-Object { [int]($_.quality -replace 'p', '') } -Descending | Select-Object -First 1
-													
-													if ($highestResolutionVideo) {
-														$VideoSrcURL = $highestResolutionVideo.src
-														switch ($highestResolutionVideo.quality) {
-															"2160p" {
-																$FileWidth = ""
-																$FileHeight = "2160"
-															}
-															"1440p" {
-																$FileWidth = ""
-																$FileHeight = "1440"
-															}
-															"1080p" {
-																$FileWidth = ""
-																$FileHeight = "1080"
-															}
-															"720p" {
-																$FileWidth = ""
-																$FileHeight = "720"
-															}
-															"480p" {
-																$FileWidth = ""
-																$FileHeight = "480"
-															}
-															"360p" {
-																$FileWidth = ""
-																$FileHeight = "360"
-															}
-															"240p" {
-																$FileWidth = ""
-																$FileHeight = "240"
-															}
-															"144p" {
-																$FileWidth = ""
-																$FileHeight = "144"
-															}
+											#videos
+											} elseif ($File.PSObject.Properties['videos']) {
+												# Write-Output "Found video"
+												#get the highest quality video
+												$highestResolutionVideo = $File.videos | Sort-Object { [int]($_.quality -replace 'p', '') } -Descending | Select-Object -First 1
+												
+												if ($highestResolutionVideo) {
+													$VideoSrcURL = $highestResolutionVideo.src
+													switch ($highestResolutionVideo.quality) {
+														"2160p" {
+															$FileWidth = ""
+															$FileHeight = "2160"
+														}
+														"1440p" {
+															$FileWidth = ""
+															$FileHeight = "1440"
+														}
+														"1080p" {
+															$FileWidth = ""
+															$FileHeight = "1080"
+														}
+														"720p" {
+															$FileWidth = ""
+															$FileHeight = "720"
+														}
+														"480p" {
+															$FileWidth = ""
+															$FileHeight = "480"
+														}
+														"360p" {
+															$FileWidth = ""
+															$FileHeight = "360"
+														}
+														"240p" {
+															$FileWidth = ""
+															$FileHeight = "240"
+														}
+														"144p" {
+															$FileWidth = ""
+															$FileHeight = "144"
 														}
 													}
-################################################################################
-													# Output the highest resolution video information
-													# Write-Output "Video URL: $VideoSrcURL"
-													# Write-Output "Resolution: $FileWidth x $FileHeight"
-													
-													#remove this to save some database space
-													$VideoSrcURL = $VideoSrcURL -replace "https://wixmp-", ""
-													
-													if ($VideoSrcURL -match "\.\w+$") {
-														# $FileExtension = $matches[0].TrimStart('.') #this removes the dot
-														$FileExtension = $matches[0]
-														# Write-Output "File Extension: $FileExtension"
-													} else {
-														Write-Output "No file extension found in $VideoSrcURL"
-														$FileExtension = ".mp4"
-													}
-													
-													$temp_query = "INSERT INTO Files (deviationID, url, src_url, extension, height, width, title, username, published_time)
-																				VALUES ('$DeviationID', '$FileUrl', '$VideoSrcURL', '$FileExtension', '$FileHeight', '$FileWidth', '$FileTitle', '$FileUsername', '$FilePublishedTime');"
-					
-													# Write-Host "`n$temp_query"
-													$sqlScript += $temp_query + " "
-													Write-Host "Added File $DeviationID ($FileTitle) ($FileExtension) to database." -ForegroundColor Green
 												}
-################################################################################
+												
+												# Output the highest resolution video information
+												# Write-Output "Video URL: $VideoSrcURL"
+												# Write-Output "Resolution: $FileWidth x $FileHeight"
+												
+												#remove this to save some database space
+												$VideoSrcURL = $VideoSrcURL -replace "https://wixmp-", ""
+												
+												if ($VideoSrcURL -match "\.\w+$") {
+													# $FileExtension = $matches[0].TrimStart('.') #this removes the dot
+													$FileExtension = $matches[0]
+													# Write-Output "File Extension: $FileExtension"
+												} else {
+													Write-Output "No file extension found in $VideoSrcURL"
+													$FileExtension = ".mp4"
+												}
+												
+												$temp_query = "INSERT INTO Files (deviationID, url, src_url, extension, height, width, title, username, published_time)
+																			VALUES ('$DeviationID', '$FileUrl', '$VideoSrcURL', '$FileExtension', '$FileHeight', '$FileWidth', '$FileTitle', '$FileUsername', '$FilePublishedTime');"
+				
+												# Write-Host "`n$temp_query"
+												$sqlScript += $temp_query + " "
+												Write-Host "Added File $DeviationID ($FileTitle) ($FileExtension) to database." -ForegroundColor Green
 											}
-################################################################################
+				
+										}
+########################################################
 									}
-################################################################################
+########################################################
 								}
 							}
-################################################################################
+########################################################
 						}
-################################################################################
+########################################################
 						# End the transaction
 						$sqlScript += "COMMIT;"  
 						#execute all queries at once
@@ -763,6 +753,9 @@ function Process-Users {
 		
 		# Start-Sleep -Milliseconds $TimeToWait
 	}
+	
+	Download-Files-From-Database -Type 1
+	
 }
 ############################################
 ####################################
