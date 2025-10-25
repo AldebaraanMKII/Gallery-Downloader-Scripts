@@ -7,7 +7,8 @@ Import-Module PSSQLite
 ########################################################
 function Download-Files-From-Database {
     param (
-        [int]$Type
+        [int]$Type,
+        [string]$Query = ""
     )
 
 	# Define the invalid characters for Windows file names
@@ -91,7 +92,12 @@ function Download-Files-From-Database {
 		}
 ######################################
 	} elseif ($Type -eq 2) {
-		$WhereQuery = $(Write-Host "`nEnter WHERE query:" -ForegroundColor cyan -NoNewLine; Read-Host) 
+        if (-not [string]::IsNullOrEmpty($Query)) {
+            $WhereQuery = $Query
+            Write-Host "`nUsing provided query: '$WhereQuery'" -ForegroundColor Blue
+        } else {
+            $WhereQuery = $(Write-Host "`nEnter WHERE query:" -ForegroundColor cyan -NoNewLine; Read-Host)
+        }
 		
 		$temp_query = "SELECT username, deviationID, src_url, extension, height, width, title, published_time FROM Files $WhereQuery;"
 	
@@ -767,6 +773,9 @@ if ($RefreshTokenExpired) {
 }
 
 function Graphical-Options {
+    param (
+        [string]$Query = ""
+    )
 	try {
 		# Start logging
 		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -814,7 +823,7 @@ function Graphical-Options {
 ##########################################
 			} elseif ($choice -eq 4){
 				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-				Download-Files-From-Database -Type 2
+				Download-Files-From-Database -Type 2 -Query $Query
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 ############################################
@@ -841,7 +850,8 @@ function Graphical-Options {
 ############################################
 function Execute-Function {
     param (
-        [int]$function
+        [int]$function,
+        [string]$Query = ""
     )
 	
 	try {
@@ -878,7 +888,7 @@ function Execute-Function {
 ##########################################
 		} elseif ($function -eq 4){
 			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Download-Files-From-Database -Type 2
+			Download-Files-From-Database -Type 2 -Query $Query
 			$stopwatch_main.Stop()
 			Write-Host "`nDownloaded files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 ##########################################

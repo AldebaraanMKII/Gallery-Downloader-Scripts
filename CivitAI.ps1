@@ -7,7 +7,8 @@ Import-Module PSSQLite
 ###############################
 function Download-Files-From-Database {
     param (
-        [int]$Type
+        [int]$Type,
+        [string]$Query = ""
     )
 
 	# Define the invalid characters for Windows file names
@@ -90,7 +91,12 @@ function Download-Files-From-Database {
 		}
 ######################################
 	} elseif ($Type -eq 2) {
-		$WhereQuery = $(Write-Host "`nEnter WHERE query:" -ForegroundColor cyan -NoNewLine; Read-Host)
+        if (-not [string]::IsNullOrEmpty($Query)) {
+            $WhereQuery = $Query
+            Write-Host "`nUsing provided query: '$WhereQuery'" -ForegroundColor Blue
+        } else {
+            $WhereQuery = $(Write-Host "`nEnter WHERE query:" -ForegroundColor cyan -NoNewLine; Read-Host)
+        }
 		
 		$temp_query = "SELECT username, id, filename, extension, width, height, url, createdAt FROM Files $WhereQuery;"
 
@@ -522,24 +528,32 @@ function Process-Users {
 }
 ############################################
 function Graphical-Options {
+    param (
+        [string]$Query = ""
+    )
 	try {
 		# Start logging
 		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
 		Start-Transcript -Path "$PSScriptRoot/logs/CivitAI_$($CurrentDate).log" -Append
-		
 		$exitScript = $false
-		while (-not $exitScript) {
-			Write-Host "`nCivitAI Powershell Downloader" -ForegroundColor Green
-			Write-Host "`nSelect a option:" -ForegroundColor Green
-			Write-Host "1. Download metadata from users to database and then download files." -ForegroundColor Green
-			Write-Host "2. Download only metadata from users to database." -ForegroundColor Green
-			Write-Host "3. Download all files in database not already downloaded (skip metadata download)." -ForegroundColor Green
-			Write-Host "4. Download all files from query." -ForegroundColor Green
-			Write-Host "5. Scan folder for files and add them to database marked as favorites." -ForegroundColor Green
-			Write-Host "6. Exit script" -ForegroundColor Green
-			
-			$choice = $(Write-Host "`nType a number (1-6):" -ForegroundColor green -NoNewLine; Read-Host) 
+        if (-not [string]::IsNullOrEmpty($Query)) {
+            Write-Host "`nQuery parameter provided. Starting download with query: '$Query'" -ForegroundColor Blue
+            $choice = 4
+        } else {
+		    while (-not $exitScript) {
+			    Write-Host "`nCivitAI Powershell Downloader" -ForegroundColor Green
+			    Write-Host "`nSelect a option:" -ForegroundColor Green
+			    Write-Host "1. Download metadata from users to database and then download files." -ForegroundColor Green
+			    Write-Host "2. Download only metadata from users to database." -ForegroundColor Green
+			    Write-Host "3. Download all files in database not already downloaded (skip metadata download)." -ForegroundColor Green
+			    Write-Host "4. Download all files from query." -ForegroundColor Green
+			    Write-Host "5. Scan folder for files and add them to database marked as favorites." -ForegroundColor Green
+			    Write-Host "6. Exit script" -ForegroundColor Green
+			    
+			    $choice = $(Write-Host "`nType a number (1-6):" -ForegroundColor green -NoNewLine; Read-Host) 
 ############################################
+		    }
+        }
 			if ($choice -eq 1) {
 				Backup-Database
 				
@@ -569,7 +583,7 @@ function Graphical-Options {
 ############################################
 			} elseif ($choice -eq 4){
 				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-				Download-Files-From-Database -Type 2
+				Download-Files-From-Database -Type 2 -Query $Query
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 ############################################
@@ -584,8 +598,6 @@ function Graphical-Options {
 				Write-Host "`nInvalid choice. Try again." -ForegroundColor Red
 			}
 ############################################
-		}
-############################################
 	} catch {
 		Write-Error "An error occurred (line $($_.InvocationInfo.ScriptLineNumber)): $($_.Exception.Message)"
 	} finally {
@@ -596,7 +608,8 @@ function Graphical-Options {
 ############################################
 function Execute-Function {
     param (
-        [int]$function
+        [int]$function,
+        [string]$Query = ""
     )
 	
 	try {
@@ -633,7 +646,7 @@ function Execute-Function {
 ############################################
 		} elseif ($function -eq 4){
 			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Download-Files-From-Database -Type 2
+			Download-Files-From-Database -Type 2 -Query $Query
 			$stopwatch_main.Stop()
 			Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 ############################################
