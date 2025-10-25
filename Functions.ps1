@@ -775,7 +775,9 @@ function Start-Download {
                 }
                 "Kemono" {
                     $FileHash, $FileExtension, $FileURL, $FileFilenameExtension, $CreatorName, $Filename = Create-Filename -row $File -Type 3
-                    $DownloadURL = "$($DownloadBaseURL)$($FileURL)/$($FileHash).$($FileExtension)"
+                    # $DownloadURL = "$($DownloadBaseURL)$($FileURL)/$($FileHash).$($FileExtension)"
+                    $DownloadURL = "$($DownloadBaseURL)$($FileURL)/$($FileHash).$($FileExtension)?f=file.$($FileFilenameExtension)"
+					
                     $DownloadSubfolderIdentifier = "$CreatorName"
                     $SetFileDownloadedQuery = "UPDATE Files SET downloaded = 1 WHERE hash = '$FileHash'"
                     $FileIdentifier = $FileHash
@@ -796,6 +798,8 @@ function Start-Download {
                 }
             }
             
+			# Write-Host "Download URL: $DownloadURL"
+					
             # Clean filename
             $Filename = $Filename -replace "[$invalidChars]", ''
             
