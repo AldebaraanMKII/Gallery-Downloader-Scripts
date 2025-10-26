@@ -36,11 +36,11 @@ $TimeToWait = 14000
 #max parallel downloads. Not recommended to set this above the default unless you like to be rate limited.
 $MaxConcurrentDownloads = 3
 ###############################
-#how many hours must pass after downloading a user's entire gallery before the script will check it again
-$TimeToCheckAgainMetadata = 336
-#how many hours must pass after downloading a user's entire gallery before the script will try to download any new files from them in the database
+#how many seconds must pass after downloading a user's entire gallery before the script will check it again
+$TimeToCheckAgainMetadata = 1209600
+#how many seconds must pass after downloading a user's entire gallery before the script will try to download any new files from them in the database
 #this is to speed things up when the script is closed for whatever reason
-$TimeToCheckAgainDownload = 336
+$TimeToCheckAgainDownload = 1209600
 ###############################
 #if set to true, will add mature content to the database
 $AllowMatureContent = $true

@@ -45,11 +45,11 @@ function Download-Files-From-Database {
 						$DateLastDownloaded = [datetime]::ParseExact($DateLastDownloaded, "yyyy-MM-dd HH:mm:ss", $null)
 		
 						$TimeDifference = $CurrentDate - $DateLastDownloaded
-						$HoursDifference = $TimeDifference.TotalHours
+						$SecondsDifference = $TimeDifference.TotalSeconds
 	
-						if ($HoursDifference -lt $TimeToCheckAgainDownload) {
+						if ($SecondsDifference -lt $TimeToCheckAgainDownload) {
 							$ContinueFetching = $false
-							Write-Host "This user's gallery was downloaded less than $TimeToCheckAgainDownload hours ago. Skipping..." -ForegroundColor Yellow
+							Write-Host "This user's gallery was downloaded less than $TimeToCheckAgainDownload seconds ago. Skipping..." -ForegroundColor Yellow
 						} else {
 							#update the last_time_downloaded column to NULL
 							$temp_query = "UPDATE Creators SET last_time_downloaded = NULL WHERE creatorID = '$CreatorID'"
@@ -239,11 +239,11 @@ function Download-Metadata-From-Creator {
 				$DateMetadataFetchCompleted = [datetime]::ParseExact($DateMetadataFetchCompleted, "yyyy-MM-dd HH:mm:ss", $null)
 		
 				$TimeDifference = $CurrentDate - $DateMetadataFetchCompleted
-				$HoursDifference = $TimeDifference.TotalHours
+				$SecondsDifference = $TimeDifference.TotalSeconds
 ########################################################
-				if ($HoursDifference -lt $TimeToCheckAgainMetadata) {
+				if ($SecondsDifference -lt $TimeToCheckAgainMetadata) {
 					$HasMoreFiles = $false
-					Write-Host "This user was updated less than $TimeToCheckAgainMetadata hours ago. Skipping..." -ForegroundColor Yellow
+					Write-Host "This user was updated less than $TimeToCheckAgainMetadata seconds ago. Skipping..." -ForegroundColor Yellow
 ########################################################
 				} else {
 					$URL = "$($BaseURL)/$Service/user/$($CreatorID)/profile"

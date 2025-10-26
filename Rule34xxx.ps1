@@ -46,11 +46,11 @@ function Download-Files-From-Database {
 						$DateLastDownloaded = [datetime]::ParseExact($DateLastDownloaded, "yyyy-MM-dd HH:mm:ss", $null)
 						
 						$TimeDifference = $CurrentDate - $DateLastDownloaded
-						$HoursDifference = $TimeDifference.TotalHours
+						$SecondsDifference = $TimeDifference.TotalSeconds
 	
-						if ($HoursDifference -lt $TimeToCheckAgainDownload) {
+						if ($SecondsDifference -lt $TimeToCheckAgainDownload) {
 							$ContinueFetching = $false
-							Write-Host "This query's files was downloaded less than $TimeToCheckAgainDownload hours ago. Skipping..." -ForegroundColor Yellow
+							Write-Host "This query's files was downloaded less than $TimeToCheckAgainDownload seconds ago. Skipping..." -ForegroundColor Yellow
 						} else {
 							#update the last_time_downloaded column to NULL
 							$temp_query = "UPDATE Queries SET last_time_downloaded = NULL WHERE query = '$query'"
@@ -177,11 +177,11 @@ function Download-Metadata-From-Query {
 				$DateLastDownloaded = [datetime]::ParseExact($DateLastDownloaded, "yyyy-MM-dd HH:mm:ss", $null)
 
 				$TimeDifference = $CurrentDate - $DateLastDownloaded
-				$HoursDifference = $TimeDifference.TotalHours
+				$SecondsDifference = $TimeDifference.TotalSeconds
 
-				if ($HoursDifference -lt $TimeToCheckAgainMetadata) {
+				if ($SecondsDifference -lt $TimeToCheckAgainMetadata) {
 					$ContinueFetching = $false
-					Write-Host "This query was updated less than $TimeToCheckAgainMetadata hours ago. Skipping..." -ForegroundColor Yellow
+					Write-Host "This query was updated less than $TimeToCheckAgainMetadata seconds ago. Skipping..." -ForegroundColor Yellow
 				} else {
 					#update the last_time_fetched_metadata column to NULL
 					$temp_query = "UPDATE Queries SET last_time_fetched_metadata = NULL WHERE query = '$Query' AND minID = $MinID AND maxID = $MaxID"

@@ -44,11 +44,11 @@ function Download-Files-From-Database {
 						$DateLastDownloaded = [datetime]::ParseExact($DateLastDownloaded, "yyyy-MM-dd HH:mm:ss", $null)
 		
 						$TimeDifference = $CurrentDate - $DateLastDownloaded
-						$HoursDifference = $TimeDifference.TotalHours
+						$SecondsDifference = $TimeDifference.TotalSeconds
 	
-						if ($HoursDifference -lt $TimeToCheckAgainDownload) {
+						if ($SecondsDifference -lt $TimeToCheckAgainDownload) {
 							$ContinueFetching = $false
-							Write-Host "This user's gallery was downloaded less than $TimeToCheckAgainDownload hours ago. Skipping..." -ForegroundColor Yellow
+							Write-Host "This user's gallery was downloaded less than $TimeToCheckAgainDownload seconds ago. Skipping..." -ForegroundColor Yellow
 						} else {
 							#update the last_time_downloaded column to NULL
 							$temp_query = "UPDATE Users SET last_time_downloaded = NULL WHERE username = '$Username'"
@@ -245,12 +245,12 @@ function Download-Metadata-From-User {
 				$DateLastDownloaded = [datetime]::ParseExact($DateLastDownloaded, "yyyy-MM-dd HH:mm:ss", $null)
 
 				$TimeDifference = $CurrentDate - $DateLastDownloaded
-				$HoursDifference = $TimeDifference.TotalHours
+				$SecondsDifference = $TimeDifference.TotalSeconds
 	
 ########################################################
-				if ($HoursDifference -lt $TimeToCheckAgainMetadata) {
+				if ($SecondsDifference -lt $TimeToCheckAgainMetadata) {
 					$ContinueFetching = $false
-					Write-Host "This user was updated less than $TimeToCheckAgainMetadata hours ago. Skipping..." -ForegroundColor Yellow
+					Write-Host "This user was updated less than $TimeToCheckAgainMetadata seconds ago. Skipping..." -ForegroundColor Yellow
 ########################################################
 				}	else {
 					$URL = "https://www.deviantart.com/api/v1/oauth2/user/profile/$($Username)?ext_collections=1&ext_galleries=1&access_token=$Access_Token"
