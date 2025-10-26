@@ -220,17 +220,6 @@ function Download-Metadata-From-User {
 ############################################
 	if ($ContinueFetching) {
 		$CurrentSkips = 0
-		
-		# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
-		$existingFileIDs = [System.Collections.Generic.HashSet[int]]::new()
-		$temp_query = "SELECT id FROM Files WHERE UPPER(username) = UPPER('$Username');"
-		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-		if ($result.Count -gt 0) {
-			foreach ($row in $result) {
-				$null = $existingFileIDs.Add($row.id)
-			}
-		}
-		
 		foreach ($Rating in $RatingList) {
 			$HasMoreFiles = $true
 ############################################
@@ -278,7 +267,13 @@ function Download-Metadata-From-User {
 							foreach ($File in $Response.items) {
 								$FileID = $File.id
 ##########################################
-								if ($existingFileIDs.Contains($FileID)) {
+								$temp_query = "SELECT EXISTS(SELECT 1 FROM Files WHERE id = '$FileID');"
+								$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+								
+								# Extract the value from the result object
+								$exists = $result."EXISTS(SELECT 1 FROM Files WHERE id = '$FileID')"
+##########################################
+								if ($exists -eq 1) {
 									Write-Host "FileID $FileID already exists in database, skipping..." -ForegroundColor Yellow
 									$CurrentSkips++
 									
@@ -292,9 +287,6 @@ function Download-Metadata-From-User {
 									}
 ##########################################
 								} else {
-									#add to hashtable if it does not exist already
-									$existingFileIDs.Add($FileID) | Out-Null
-									
 									$FileUrlRaw = $File.url
 									
 									# $FileHash = $File.hash
