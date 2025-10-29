@@ -9,3 +9,5 @@ $logPath = "$PSScriptRoot/logs"
 
 # Delete the original log files after compression
 Remove-Item -Path "$logPath/*.log"
+
+[console]::beep()

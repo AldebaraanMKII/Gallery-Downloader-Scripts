@@ -6,7 +6,7 @@ $sqliteFiles = Get-ChildItem -Path . -Filter *.sqlite3
 
 foreach ($file in $sqliteFiles) {
     $filePath = $file.FullName
-    $archivePath = "$($file.BaseName) $date.7z"
+    $archivePath = "$($file.BaseName)_$date.7z"
     
     Write-Host "Creating archive for: $filePath"
     
@@ -21,5 +21,5 @@ foreach ($file in $sqliteFiles) {
 }
 
 Write-Host "Archiving completed."
-
+[console]::beep()
 pause

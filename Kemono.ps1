@@ -779,6 +779,7 @@ function Graphical-Options {
 				Download-Files-From-Database -FavoritesOnly $false -RedownloadEverything $false
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				[console]::beep()
 ############################################
 			} elseif ($choice -eq 2){
 				Backup-Database
@@ -787,22 +788,26 @@ function Graphical-Options {
 				Process-Creators
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all metadata from creators in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				[console]::beep()
 ############################################
 			} elseif ($choice -eq 3){
 				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
 				Download-Files-From-Database -type 1
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				[console]::beep()
 ############################################
 			} elseif ($choice -eq 4){
 				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
 				Download-Files-From-Database -type 2 -Query $Query
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				[console]::beep()
 ############################################
 			} elseif ($choice -eq 5){
 				Backup-Database
 				Scan-Folder-And-Add-Files-As-Favorites -Type 3
+				[console]::beep()
 ############################################
 			} elseif ($choice -eq 6){
 				$exitScript = $true
@@ -844,6 +849,7 @@ function Execute-Function {
 			Download-Files-From-Database -Type 1
 			$stopwatch_main.Stop()
 			Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			[console]::beep()
 ###########################################
 		} elseif ($function -eq 2){
 			Backup-Database
@@ -852,22 +858,26 @@ function Execute-Function {
 			Process-Creators
 			$stopwatch_main.Stop()
 			Write-Host "`nDownloaded all metadata from creators in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			[console]::beep()
 ###########################################
 		} elseif ($function -eq 3){
 			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
 			Download-Files-From-Database -Type 1
 			$stopwatch_main.Stop()
 			Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			[console]::beep()
 ###########################################
 		} elseif ($function -eq 4){
 			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
 			Download-Files-From-Database -Type 2 -Query $Query
 			$stopwatch_main.Stop()
 			Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			[console]::beep()
 ###########################################
 		} elseif ($function -eq 5){
 			Backup-Database
 			Scan-Folder-And-Add-Files-As-Favorites -Type 3
+			[console]::beep()
 ###########################################
 		} else {
 			Write-Host "`nInvalid choice. Try again." -ForegroundColor Red
