@@ -84,6 +84,9 @@ Examples:
 - `WHERE username = 'username1' AND downloaded = 0` - will download all files not already downloaded from username "username1"
 
 Use a tool like HeidiSQL to open the database and check the column names for constructing queries.
+
+You can also run the script with a query like this: `. .\ScriptName.ps1; Execute-Function -function 4 -query "WHERE downloaded = 0"`. It will start downloading immediately.
+
 Note: when using the query to download the items will be downloaded by ID/Hash/GUID or whatever the unique column in the database for that site is.
 
 
