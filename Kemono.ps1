@@ -299,28 +299,6 @@ function Download-Metadata-From-Creator {
 ########################################################
 		$CurrentSkips = 0
 ########################################################
-		if ($HasMoreFiles) {
-			# Get all post IDs for the current user from the database and store them in a hash set for faster lookups
-			$existingPostIDs = [System.Collections.Generic.HashSet[string]]::new()
-			$temp_query = "SELECT postID FROM Posts WHERE UPPER(creatorName) = UPPER('$CreatorName');"
-			$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-			if ($result.Count -gt 0) {
-				foreach ($row in $result) {
-					$null = $existingPostIDs.Add($row.postID)
-				}
-			}
-########################################################
-			# Get all file IDs for the current user from the database and store them in a hash set for faster lookups
-			$existingFileHashes = [System.Collections.Generic.HashSet[string]]::new()
-			$temp_query = "SELECT hash FROM Files WHERE UPPER(creatorName) = UPPER('$CreatorName');"
-			$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-			if ($result.Count -gt 0) {
-				foreach ($row in $result) {
-					$null = $existingFileHashes.Add($row.hash)
-				}
-			}
-		}
-########################################################
 		# Loop through pages of files for the user
 		while ($HasMoreFiles) {
 			$retryCount = 0
@@ -375,9 +353,14 @@ function Download-Metadata-From-Creator {
 								Write-Host "`npost $PostTitle (ID $PostID) failed the title word filter." -ForegroundColor Yellow
 							}
 
-
 							if ($Continue) {
-								if ($existingPostIDs.Contains($PostID)) {
+								$temp_query = "SELECT EXISTS(SELECT 1 from Posts WHERE postID = '$PostID');"
+								$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+								
+								# Extract the value from the result object
+								$exists = $result."EXISTS(SELECT 1 from Posts WHERE postID = '$PostID')"
+
+								if ($exists -eq 1) {
 									Write-Host "`n`nPost ID $PostID already exists in database, skipping..." -ForegroundColor Yellow
 									$CurrentSkips++
 									
@@ -391,9 +374,6 @@ function Download-Metadata-From-Creator {
 									}
 ############################################
 								} else {
-									#add to hashtable
-									$existingPostIDs.Add($PostID) | Out-Null
-									
 									$stopwatchPost = [System.Diagnostics.Stopwatch]::StartNew() 
 									Write-Host "`n`nAdding post $PostTitle ($PostID) to database..." -ForegroundColor Green
 					 
@@ -487,11 +467,15 @@ function Download-Metadata-From-Creator {
 													# Split the filename and extension
 													$FileHash, $HashExtension = $HashWithExtension -split '\.'
 ########################################################################################
-													if ($existingFileHashes.Contains($FileHash)) {
+													$temp_query = "SELECT exists(SELECT 1 FROM Files WHERE hash = '$FileHash');"
+													$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+													
+													# Extract the value from the result object
+													$exists = $result."EXISTS(SELECT 1 from Files WHERE hash = '$FileHash')"
+													
+													if ($exists -eq 1) {
 														Write-Host "File $Filename ($FileHash) already exists in database, skipping..." -ForegroundColor Yellow
 													} else {
-														#add to hashtable
-														$existingFileHashes.Add($FileHash) | Out-Null
 														# Write-Host "Adding file $Filename to database"
 														
 														$FileURL = Split-Path -Path $FileURLRaw -Parent
@@ -564,7 +548,6 @@ function Download-Metadata-From-Creator {
 													if ($exists -eq 1) {
 														Write-Host "File $Filename ($FileHash) already exists in database, skipping..." -ForegroundColor Yellow
 													}	else {
-														
 														$FileURL = Split-Path -Path $FileURLRaw -Parent
 														# Write-Output $FileURL
 									
