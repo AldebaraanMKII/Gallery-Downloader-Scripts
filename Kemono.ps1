@@ -270,7 +270,7 @@ function Download-Metadata-From-Creator {
 						#if time that this user was last fetched is higher than the actual update time from kemono, skip it
 						if ($DateMetadataFetchCompleted -gt $DateUpdatedFormatted) {
 							$HasMoreFiles = $false
-							Write-Host "This user was updated . Skipping..." -ForegroundColor Yellow
+							Write-Host "This user didn't receive any updates since last fetched. Skipping..." -ForegroundColor Yellow
 						}
 					}
 ########################################################
