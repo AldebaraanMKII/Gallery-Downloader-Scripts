@@ -738,9 +738,9 @@ if (-not (Test-Path $DBFilePath)) {
 		title TEXT,
 		username TEXT,
 		published_time TEXT,
-		downloaded INTEGER DEFAULT 0,
-		favorite INTEGER DEFAULT 0,
-		deleted INTEGER DEFAULT 0
+		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+		favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+		deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
 		);"
 	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 }

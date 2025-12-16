@@ -580,9 +580,9 @@ if (-not (Test-Path $DBFilePath)) {
 		tags_general TEXT,
 		tags_copyright TEXT,
 		tags_meta TEXT,
-		downloaded INTEGER DEFAULT 0,
-		favorite INTEGER DEFAULT 0,
-		deleted INTEGER DEFAULT 0
+		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+		favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+		deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
 		)"
 	
 	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery

@@ -498,9 +498,9 @@ if (-not (Test-Path $DBFilePath)) {
 		meta_hires_upscaler TEXT,
 		meta_negativePrompt TEXT,
 		meta_denoising_strength FLOAT DEFAULT 0,
-		downloaded INTEGER DEFAULT 0,
-		favorite INTEGER DEFAULT 0,
-		deleted INTEGER DEFAULT 0
+		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+		favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+		deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
 		);
 		"
 		

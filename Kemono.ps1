@@ -686,7 +686,7 @@ if (-not (Test-Path $DBFilePath)) {
 		total_files INTEGER DEFAULT 0,
 		date_published TEXT,
 		date_added TEXT,
-		downloaded INTEGER DEFAULT 0);
+		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
 		"
 	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 	
@@ -700,9 +700,9 @@ if (-not (Test-Path $DBFilePath)) {
 		file_index INTEGER DEFAULT 0,
 		creatorName TEXT,
 		postID TEXT,
-		downloaded INTEGER DEFAULT 0,
-		favorite INTEGER DEFAULT 0,
-		deleted INTEGER DEFAULT 0
+		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+		favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+		deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
 		);
 		"
 	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery

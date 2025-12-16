@@ -184,16 +184,14 @@ function Calculate-Delay {
 		
 		if ($retryCount -eq 0){
 			$delay = $initialDelay
-			return $delay
 		} else {
 			$delay = $initialDelay * [math]::Pow(2, $retryCount)
-			return $delay
 		}
 		
 		if ($delay -gt $MaxDelay){
 			$delay = $MaxDelay
-			return $delay
 		}
+		return $delay
 }
 ###############################
 # Function to scan a folder
@@ -624,7 +622,7 @@ function Handle-Errors {
 ##########################################################################
 	#General errors
 	} elseif ($Type -eq 2) {
-		if ($StatusCode -in 429, 500, 520) {
+		if ($StatusCode -in 429, 500, 520, 1015) {
 			$delay = Calculate-Delay -retryCount $retryCount
 		
 			$retryCount++
@@ -635,6 +633,8 @@ function Handle-Errors {
 				Write-Host "Error 500: Internal Server Error. Retrying in $delay milliseconds..." -ForegroundColor Red
 			} elseif ($StatusCode -eq 520) {
 				Write-Host "Error 520: Internal Server Error. Retrying in $delay milliseconds..." -ForegroundColor Red
+			} elseif ($StatusCode -eq 1015) {
+				Write-Host "Error 1015: Rate limited. Retrying in $delay milliseconds..." -ForegroundColor Red
 			}
 		
 			Start-Sleep -Milliseconds $delay
@@ -645,13 +645,19 @@ function Handle-Errors {
 		} elseif ($StatusCode -in 404, 401) {
 			if ($StatusCode -eq 404) {
 				Write-Host "(ID: $FileIdentifier) Error 404. This means the file was deleted. It will be set to deleted in the database so that it's not processed again." -ForegroundColor Red
-				$temp_query = "UPDATE Files SET deleted = 1 WHERE $DataQuery"
+				$temp_query = "UPDATE Files SET deleted, downloaded = 1 WHERE $DataQuery"
 				Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+				
+				#it seems now civitai is more agressive with their rate limits. This waits X milliseconds before going to the next file.
+				Start-Sleep -Milliseconds 300
 #####################################
 			} elseif ($StatusCode -eq 401) {
 				Write-Host "(ID: $FileIdentifier) Error 401. This means the file was locked by its creator, and you do not have access to it. It will be set to downloaded in the database so that it's not processed again." -ForegroundColor Red
 				$temp_query = "UPDATE Files SET downloaded = 1 WHERE $DataQuery"
 				Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+				
+				#This waits X milliseconds before going to the next file.
+				Start-Sleep -Milliseconds 300
 			}
 			
 			$BreakLoop = $true
@@ -717,6 +723,9 @@ function Start-Download {
             $CreateFilenameFunction,
             $HandleErrorsFunction,
             $InvokeSqliteQueryFunction,
+            $CalculateDelayFunction,
+            $initialDelay,
+            $MaxDelay,
             $FileIndex,
             $TotalFiles,
             $FilenameTemplate,
@@ -747,11 +756,17 @@ function Start-Download {
         $CreateFilenameScriptBlock = [ScriptBlock]::Create("function Create-Filename { $CreateFilenameFunction }")
         $HandleErrorsScriptBlock = [ScriptBlock]::Create("function Handle-Errors { $HandleErrorsFunction }")
         $InvokeSqliteQueryScriptBlock = [ScriptBlock]::Create("function Invoke-SqliteQuery { $InvokeSqliteQueryFunction }")
+        $CalculateDelayScriptBlock = [ScriptBlock]::Create("function Calculate-Delay { $CalculateDelayFunction }")
+        
+        # Set script-level variables for the delay calculation
+        Set-Variable -Name "initialDelay" -Value $initialDelay -Scope Script
+        Set-Variable -Name "MaxDelay" -Value $MaxDelay -Scope Script
         
         # Execute the function definitions
         . $CreateFilenameScriptBlock
         . $HandleErrorsScriptBlock  
         . $InvokeSqliteQueryScriptBlock
+        . $CalculateDelayScriptBlock
         
         try {
             # Process file based on site type
@@ -1080,6 +1095,7 @@ function Start-Download {
     $CreateFilenameFunction = Get-Command Create-Filename | Select-Object -ExpandProperty Definition
     $HandleErrorsFunction = Get-Command Handle-Errors | Select-Object -ExpandProperty Definition  
     $InvokeSqliteQueryFunction = Get-Command Invoke-SqliteQuery | Select-Object -ExpandProperty Definition
+    $CalculateDelayFunction = Get-Command Calculate-Delay | Select-Object -ExpandProperty Definition
     
     # Process files in batches to manage memory usage
     # $BatchSize = [Math]::Min(100, $MaxConcurrentDownloads * 200)  # Process in batches
@@ -1121,6 +1137,9 @@ function Start-Download {
             [void]$PowerShell.AddArgument($CreateFilenameFunction)
             [void]$PowerShell.AddArgument($HandleErrorsFunction)
             [void]$PowerShell.AddArgument($InvokeSqliteQueryFunction)
+            [void]$PowerShell.AddArgument($CalculateDelayFunction)
+            [void]$PowerShell.AddArgument($initialDelay)
+            [void]$PowerShell.AddArgument($MaxDelay)
             [void]$PowerShell.AddArgument($ProcessedFiles)
             [void]$PowerShell.AddArgument($FilesRemaining)
             [void]$PowerShell.AddArgument($FilenameTemplate)
