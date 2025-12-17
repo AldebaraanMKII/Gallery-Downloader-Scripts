@@ -10,6 +10,7 @@ function Download-Files-From-Database {
         [int]$Type,
         [string]$Query = ""
     )
+    Write-Host "Files Table Columns (for download operations): hash[string], hash_extension[string], filename[string], filename_extension[string], url[string], file_index[int], creatorName[string], postID[string], downloaded[int/0-1], favorite[int/0-1], deleted[int/0-1]" -ForegroundColor Cyan
 	
 	# Define the invalid characters for Windows file names
 	$invalidChars = [System.IO.Path]::GetInvalidFileNameChars() -join ''
