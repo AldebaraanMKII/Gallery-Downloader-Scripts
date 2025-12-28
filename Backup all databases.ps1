@@ -4,9 +4,12 @@ $date = Get-Date -Format "yyyyMMdd_HHmmss"
 # Get all .sqlite3 files in the current directory
 $sqliteFiles = Get-ChildItem -Path . -Filter *.sqlite3
 
+# $SaveBasePath = "I:\"
+$SaveBasePath = "$PSScriptRoot/"
+
 foreach ($file in $sqliteFiles) {
     $filePath = $file.FullName
-    $archivePath = "$($file.BaseName)_$date.7z"
+    $archivePath = "$($SaveBasePath)$($file.BaseName)_$date.7z"
     
     Write-Host "Creating archive for: $filePath"
     
