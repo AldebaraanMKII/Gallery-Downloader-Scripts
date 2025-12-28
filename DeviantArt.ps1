@@ -1,3 +1,12 @@
+[CmdletBinding()]
+param (
+    [string]$Function,
+    [string]$Query,
+    [string]$Username,
+    [string]$WordFilter = "",
+    [string]$WordFilterExclude = ""
+)
+
 Import-Module PSSQLite
 
 ###############################
@@ -765,6 +774,19 @@ function Process-Users {
 	
 }
 ############################################
+function Process-Users-MetadataOnly {
+	# Loop through the user list and download files
+	foreach ($User in $UserList) {
+		$Username = $User[0]
+		$WordFilter = $User[1]
+		$WordFilterExclude = $User[2]
+		
+		Download-Metadata-From-User -Username $Username -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
+		
+		# Start-Sleep -Milliseconds $TimeToWait
+	}
+}
+############################################
 ####################################
 ####################################
 $RefreshTokenExpired = Check-if-Refresh-Token-Expired
@@ -773,7 +795,7 @@ if ($RefreshTokenExpired) {
 	$Access_Token = Get-Tokens-From-Authorization-Code
 }
 
-function Graphical-Options {
+function Show-Menu {
     param (
         [string]$Query = ""
     )
@@ -813,7 +835,7 @@ function Graphical-Options {
 				Backup-Database
 				
 				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-				Process-Users
+				Process-Users-MetadataOnly
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 				[console]::beep()
@@ -854,69 +876,77 @@ function Graphical-Options {
 	}
 }
 ############################################
-function Execute-Function {
-    param (
-        [int]$function,
-        [string]$Query = ""
-    )
-	
-	try {
-		# Start logging
-		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
-		Start-Transcript -Path "$PSScriptRoot/logs/DeviantArt_$($CurrentDate).log" -Append
-############################################
-		if ($function -eq 1) {
-			Backup-Database
-			
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Process-Users
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Download-Files-From-Database -Type 1
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			[console]::beep()
-##########################################
-		} elseif ($function -eq 2){
-			Backup-Database
-			
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Process-Users
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			[console]::beep()
-##########################################
-		} elseif ($function -eq 3){
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Download-Files-From-Database -Type 1
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			[console]::beep()
-##########################################
-		} elseif ($function -eq 4){
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Download-Files-From-Database -Type 2 -Query $Query
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			[console]::beep()
-##########################################
-		} elseif ($function -eq 5){
-			Backup-Database
-			Scan-Folder-And-Add-Files-As-Favorites -Type 4
-			[console]::beep()
-##########################################
-		} else {
-			Write-Host "`nInvalid choice." -ForegroundColor Red
-		}
-##########################################
-	} catch {
-		Write-Error "An error occurred (line $($_.InvocationInfo.ScriptLineNumber)): $($_.Exception.Message)"
-	} finally {
-		Stop-Transcript
-		# Write-Output "Transcript stopped"
-	}
-}
-############################################
 
+
+
+# Handle refresh token expiration if it's outside a function
+$RefreshTokenExpired = Check-if-Refresh-Token-Expired
+if ($RefreshTokenExpired) {
+	$Access_Token = Get-Tokens-From-Authorization-Code
+}
+
+if ($Function) {
+	# Start logging
+	$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
+	Start-Transcript -Path "$PSScriptRoot/logs/DeviantArt_$($CurrentDate).log" -Append
+    switch ($Function) {
+        'DownloadAllMetadataAndFiles' { 
+            Backup-Database
+            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+            Process-Users
+            $stopwatch_main.Stop()
+            Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+            Download-Files-From-Database -Type 1
+            $stopwatch_main.Stop()
+            Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+        }
+        'DownloadAllMetadata' { 
+            Backup-Database
+            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+            Process-Users-MetadataOnly
+            $stopwatch_main.Stop()
+            Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+        }
+        'DownloadOnlyFiles' { 
+            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+            Download-Files-From-Database -Type 1
+            $stopwatch_main.Stop()
+            Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+        }
+        'DownloadFilesFromQuery' {
+            if ([string]::IsNullOrWhiteSpace($Query)) {
+                Write-Host "The -Query parameter is required for the DownloadFilesFromQuery function." -ForegroundColor Red
+            } else {
+                $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+                Download-Files-From-Database -Type 2 -Query $Query
+                $stopwatch_main.Stop()
+                Write-Host "`nDownloaded files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+            }
+        }
+        'ScanFolderForFavorites' { 
+            Backup-Database
+            Scan-Folder-And-Add-Files-As-Favorites -Type 4
+        }
+        'DownloadMetadataForSingleUser' {
+            if ([string]::IsNullOrWhiteSpace($Username)) {
+                Write-Host "The -Username parameter is required for the DownloadMetadataForSingleUser function." -ForegroundColor Red
+            } else {
+                Backup-Database
+                $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+                Download-Metadata-From-User -Username $Username -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
+                $stopwatch_main.Stop()
+                Write-Host "`nDownloaded metadata for user $Username in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+            }
+        }
+        default { Write-Host "Invalid function name: $Function" -ForegroundColor Red }
+    }
+	Stop-Transcript
+    [console]::beep()
+    Pause
+##########################################################################
+} else {
+    Show-Menu
+    [console]::beep()
+    Pause
+}

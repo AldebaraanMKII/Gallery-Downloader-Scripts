@@ -1,3 +1,15 @@
+[CmdletBinding()]
+param (
+    [string]$Function,
+    [string]$Query,
+    [string]$CreatorName,
+    [string]$CreatorID,
+    [string]$Service,
+    [string]$WordFilter = "",
+    [string]$WordFilterExclude = "",
+    [string]$Files_To_Exclude = ""
+)
+
 Import-Module PSSQLite
 
 ########################################################
@@ -687,7 +699,7 @@ if (-not (Test-Path $DBFilePath)) {
 		total_files INTEGER DEFAULT 0,
 		date_published TEXT,
 		date_added TEXT,
-		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)))
 		"
 	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 	
@@ -728,8 +740,10 @@ function Process-Creators {
 		# Start-Sleep -Milliseconds $TimeToWait
 	}
 }
+
+
 ############################################
-function Graphical-Options {
+function Show-Menu {
     param (
         [string]$Query = ""
     )
@@ -760,7 +774,7 @@ function Graphical-Options {
 				Write-Host "`nDownloaded all metadata from creators in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 				
 				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-				Download-Files-From-Database -FavoritesOnly $false -RedownloadEverything $false
+				Download-Files-From-Database -Type 1
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 				[console]::beep()
@@ -776,14 +790,14 @@ function Graphical-Options {
 ############################################
 			} elseif ($choice -eq 3){
 				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-				Download-Files-From-Database -type 1
+				Download-Files-From-Database -Type 1
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 				[console]::beep()
 ############################################
 			} elseif ($choice -eq 4){
 				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-				Download-Files-From-Database -type 2 -Query $Query
+				Download-Files-From-Database -Type 2 -Query $Query
 				$stopwatch_main.Stop()
 				Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 				[console]::beep()
@@ -810,68 +824,72 @@ function Graphical-Options {
 	}
 }
 ############################################
-function Execute-Function {
-    param (
-        [int]$function,
-        [string]$Query = ""
-    )
-	
-	try {
-		# Start logging
-		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
-		Start-Transcript -Path "$PSScriptRoot/logs/Kemono_$($CurrentDate).log" -Append
-###########################################
-		if ($function -eq 1) {
-			Backup-Database
-			
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Process-Creators
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all metadata from creators in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Download-Files-From-Database -Type 1
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			[console]::beep()
-###########################################
-		} elseif ($function -eq 2){
-			Backup-Database
-			
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Process-Creators
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all metadata from creators in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			[console]::beep()
-###########################################
-		} elseif ($function -eq 3){
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Download-Files-From-Database -Type 1
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			[console]::beep()
-###########################################
-		} elseif ($function -eq 4){
-			$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-			Download-Files-From-Database -Type 2 -Query $Query
-			$stopwatch_main.Stop()
-			Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-			[console]::beep()
-###########################################
-		} elseif ($function -eq 5){
-			Backup-Database
-			Scan-Folder-And-Add-Files-As-Favorites -Type 3
-			[console]::beep()
-###########################################
-		} else {
-			Write-Host "`nInvalid choice. Try again." -ForegroundColor Red
-		}
-############################################
-	} catch {
-		Write-Error "An error occurred (line $($_.InvocationInfo.ScriptLineNumber)): $($_.Exception.Message)"
-	} finally {
-		Stop-Transcript
-		# Write-Output "Transcript stopped"
-	}
+
+
+
+
+if ($Function) {
+	# Start logging
+	$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
+	Start-Transcript -Path "$PSScriptRoot/logs/Kemono_$($CurrentDate).log" -Append
+    switch ($Function) {
+        'DownloadAllMetadataAndFiles' { 
+            Backup-Database
+            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+            Process-Creators
+            $stopwatch_main.Stop()
+            Write-Host "`nDownloaded all metadata from creators in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+            Download-Files-From-Database -Type 1
+            $stopwatch_main.Stop()
+            Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+        }
+        'DownloadAllMetadata' { 
+            Backup-Database
+            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+            Process-Creators
+            $stopwatch_main.Stop()
+            Write-Host "`nDownloaded all metadata from creators in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+        }
+        'DownloadOnlyFiles' { 
+            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+            Download-Files-From-Database -Type 1
+            $stopwatch_main.Stop()
+            Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+        }
+        'DownloadFilesFromQuery' {
+            if ([string]::IsNullOrWhiteSpace($Query)) {
+                Write-Host "The -Query parameter is required for the DownloadFilesFromQuery function." -ForegroundColor Red
+            } else {
+                $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+                Download-Files-From-Database -Type 2 -Query $Query
+                $stopwatch_main.Stop()
+                Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+            }
+        }
+        'ScanFolderForFavorites' { 
+            Backup-Database
+            Scan-Folder-And-Add-Files-As-Favorites -Type 3
+        }
+        'DownloadMetadataForSingleCreator' {
+            if ([string]::IsNullOrWhiteSpace($CreatorName) -or [string]::IsNullOrWhiteSpace($CreatorID) -or [string]::IsNullOrWhiteSpace($Service)) {
+                Write-Host "The -CreatorName, -CreatorID, and -Service parameters are required for the DownloadMetadataForSingleCreator function." -ForegroundColor Red
+            } else {
+                Backup-Database
+                $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+                Download-Metadata-From-Creator -CreatorName $CreatorName -CreatorID $CreatorID -Service $Service -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude -Files_To_Exclude $Files_To_Exclude
+                $stopwatch_main.Stop()
+                Write-Host "`nDownloaded metadata for creator $CreatorName ($Service) in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+            }
+        }
+        default { Write-Host "Invalid function name: $Function" -ForegroundColor Red }
+    }
+	Stop-Transcript
+    [console]::beep()
+    Pause
+##########################################################################
+} else {
+    Show-Menu
+    [console]::beep()
+    Pause
 }
-############################################
