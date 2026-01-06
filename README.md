@@ -61,21 +61,18 @@ A collection of PowerShell scripts to download images/videos from various websit
 1. Open a PowerShell terminal in the same folder as the scripts
 2. Run:
    ```powershell
-   . .\ScriptName.ps1; Execute-Function -function X
+   . .\ScriptName.ps1; Function -Function X
    ```
    
    Where `ScriptName` is the name of the website you want to download from (e.g., `CivitAI.ps1`), and `X` is one of the following options:
-
-	   1. Download metadata from users/queries to database and then download files
-	   2. Download only metadata from users/queries to database
-	   3. Download all files in database not already downloaded (skip metadata download)
-	   4. Download files in database from query
-	   5. Scan folder for files and add them to database marked as favorites
-
-You can also run a graphical interface:
-```powershell
-. .\ScriptName.ps1; Graphical-Options
-```
+   
+	   1. DownloadAllMetadataAndFiles (Download metadata from users/queries to database and then download files)
+	   2. DownloadAllMetadata (Download only metadata from users/queries to database)
+	   3. DownloadOnlyFiles (Download all files in database not already downloaded (skip metadata download))
+	   4. DownloadFilesFromQuery -Query $SQLquery (Download files in database from query)
+	   5. ScanFolderForFavorites (Scan folder for files and add them to database marked as favorites)
+	   6. DownloadMetadataForSingleUser -Username $Username (Downloads metadata for a single user)
+   
 
 ### Using Custom Queries (Option 4)
 
@@ -84,8 +81,6 @@ Examples:
 - `WHERE username = 'username1' AND downloaded = 0` - will download all files not already downloaded from username "username1"
 
 Use a tool like HeidiSQL to open the database and check the column names for constructing queries.
-
-You can also run the script with a query like this: `. .\ScriptName.ps1; Execute-Function -function 4 -query "WHERE downloaded = 0"`. It will start downloading immediately.
 
 Note: when using the query to download the items will be downloaded by ID/Hash/GUID or whatever the unique column in the database for that site is.
 
