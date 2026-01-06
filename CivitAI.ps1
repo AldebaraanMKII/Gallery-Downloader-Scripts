@@ -111,8 +111,11 @@ function Download-Files-From-Database {
 		
 		$temp_query = "SELECT username, id, filename, extension, width, height, url, createdAt FROM Files $WhereQuery;"
 
+        $stopwatch_temp = [System.Diagnostics.Stopwatch]::StartNew()
 		# Write-Host "temp_query: $temp_query" -ForegroundColor Yellow
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+        $stopwatch_temp.Stop()
+        Write-Host "`nFetched results in $($stopwatch_temp.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
 ######################################
 		if ($result.Count -gt 0) {
 			Start-Download -SiteName "CivitAI" -FileList $result
