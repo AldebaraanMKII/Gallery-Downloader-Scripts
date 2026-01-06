@@ -57,11 +57,12 @@ A collection of PowerShell scripts to download images/videos from various websit
 6. Refer to the configuration files' comments to understand each option
 
 ## Usage
+You can just double click the script in question to show the graphical options. Or:
 
 1. Open a PowerShell terminal in the same folder as the scripts
 2. Run:
    ```powershell
-   . .\ScriptName.ps1; Function -Function X
+   . "$PSScriptRoot\ScriptName.ps1"; Function -Function X
    ```
    
    Where `ScriptName` is the name of the website you want to download from (e.g., `CivitAI.ps1`), and `X` is one of the following options:
@@ -72,7 +73,7 @@ A collection of PowerShell scripts to download images/videos from various websit
 	   4. DownloadFilesFromQuery -Query $SQLquery (Download files in database from query)
 	   5. ScanFolderForFavorites (Scan folder for files and add them to database marked as favorites)
 	   6. DownloadMetadataForSingleUser -Username $Username (Downloads metadata for a single user)
-   
+
 
 ### Using Custom Queries (Option 4)
 
