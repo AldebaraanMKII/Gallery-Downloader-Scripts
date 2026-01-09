@@ -176,9 +176,11 @@ function Download-Metadata-From-User {
 				# $Response
 ########################################################
 				if ($Response.StatusCode -in 400, 404) {
-					Write-Output "User $username not found (400/404 error)" -ForegroundColor Red
+					Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
+					$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
+					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 					$ContinueFetching = $false
-					break
+					return #go to next user
 ################################## too many requests, try again
 				} elseif ($Response.StatusCode -in 429, 500) {
 					$delay = Calculate-Delay -retryCount $retryCount
@@ -220,6 +222,13 @@ function Download-Metadata-From-User {
 					$ContinueFetching = $false
 					break
 ########################################################
+				} elseif ($Response.error_code -in 400, 404) {
+					Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
+					$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
+					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+					$ContinueFetching = $false
+					return #go to next user
+########################################################
 				} else {
 					Write-Host "(Download-Metadata-From-User 1) An unexpected error occurred: $($Response.error_description)" -ForegroundColor Red
 					$ContinueFetching = $false
@@ -232,8 +241,19 @@ function Download-Metadata-From-User {
 ########################################################
 	} else {
 		Write-Host "`nFound user $Username in database." -ForegroundColor Green
+##########################################
+		#check if deleted
+		$temp_query = "SELECT deleted FROM Users WHERE username = '$Username'"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+							
+		$deleted = $result[0].deleted
+		# Check the result
+		if ($deleted -eq 1) {
+			Write-Host "User $Username is deleted. Skipping..." -ForegroundColor Yellow
+			return #go to next user
+		}
 ################## Check and retrieve access token
-		  $AccessCodeExpired = Check-if-Access-Token-Expired
+		$AccessCodeExpired = Check-if-Access-Token-Expired
 		if ($AccessCodeExpired) {
 			Write-Host "Access token expired. Requesting a new one..." -ForegroundColor Yellow
 			# $Access_Token = Refresh-Access-Token
@@ -273,9 +293,11 @@ function Download-Metadata-From-User {
 						$Response = Invoke-RestMethod -Uri $URL -Method Get
 						
 						if ($Response.StatusCode -in 400, 404) {
-							Write-Output "User $username not found (400/404 error)" -ForegroundColor Red
+							Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
+							$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
+							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 							$ContinueFetching = $false
-							# break
+							return
 ######################################################## too many requests, try again
 						} elseif ($Response.StatusCode -in 429, 500) {
 							$delay = Calculate-Delay -retryCount $retryCount
@@ -298,8 +320,16 @@ function Download-Metadata-From-User {
 						}
 ########################################################
 					} catch {
-						Write-Host "(Download-Metadata-From-User 2) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
-						$ContinueFetching = $false
+						if ($Response.error_code -in 400, 404) {
+							Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
+							$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
+							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+							$ContinueFetching = $false
+							return #go to next user
+						} else {
+							Write-Host "(Download-Metadata-From-User 2) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
+							$ContinueFetching = $false
+						}
 					}
 ########################################################
 				}
@@ -737,7 +767,8 @@ if (-not (Test-Path $DBFilePath)) {
 		total_user_deviations INTEGER DEFAULT 0,
 		last_time_fetched_metadata TEXT,
 		last_time_downloaded TEXT,
-		cur_offset INTEGER DEFAULT 0
+		cur_offset INTEGER DEFAULT 0,
+		deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
 		);"
 	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 	
@@ -878,75 +909,78 @@ function Show-Menu {
 		# Write-Output "Transcript stopped"
 	}
 }
-############################################
-
-
-
+##########################################################################
 # Handle refresh token expiration if it's outside a function
 $RefreshTokenExpired = Check-if-Refresh-Token-Expired
 if ($RefreshTokenExpired) {
 	$Access_Token = Get-Tokens-From-Authorization-Code
 }
-
+##########################################################################
 if ($Function) {
-	# Start logging
-	$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
-	Start-Transcript -Path "$PSScriptRoot/logs/DeviantArt_$($CurrentDate).log" -Append
-    switch ($Function) {
-        'DownloadAllMetadataAndFiles' { 
-            Backup-Database
-            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-            Process-Users
-            $stopwatch_main.Stop()
-            Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-            Download-Files-From-Database -Type 1
-            $stopwatch_main.Stop()
-            Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-        }
-        'DownloadAllMetadata' { 
-            Backup-Database
-            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-            Process-Users-MetadataOnly
-            $stopwatch_main.Stop()
-            Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-        }
-        'DownloadOnlyFiles' { 
-            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-            Download-Files-From-Database -Type 1
-            $stopwatch_main.Stop()
-            Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-        }
-        'DownloadFilesFromQuery' {
-            if ([string]::IsNullOrWhiteSpace($Query)) {
-                Write-Host "The -Query parameter is required for the DownloadFilesFromQuery function." -ForegroundColor Red
-            } else {
-                $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-                Download-Files-From-Database -Type 2 -Query $Query
-                $stopwatch_main.Stop()
-                Write-Host "`nDownloaded files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-            }
-        }
-        'ScanFolderForFavorites' { 
-            Backup-Database
-            Scan-Folder-And-Add-Files-As-Favorites -Type 4
-        }
-        'DownloadMetadataForSingleUser' {
-            if ([string]::IsNullOrWhiteSpace($Username)) {
-                Write-Host "The -Username parameter is required for the DownloadMetadataForSingleUser function." -ForegroundColor Red
-            } else {
-                Backup-Database
-                $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-                Download-Metadata-From-User -Username $Username -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
-                $stopwatch_main.Stop()
-                Write-Host "`nDownloaded metadata for user $Username in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-            }
-        }
-        default { Write-Host "Invalid function name: $Function" -ForegroundColor Red }
-    }
-	Stop-Transcript
-    [console]::beep()
-    Pause
+	try {
+		# Start logging
+		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
+		Start-Transcript -Path "$PSScriptRoot/logs/DeviantArt_$($CurrentDate).log" -Append
+		switch ($Function) {
+			'DownloadAllMetadataAndFiles' { 
+				Backup-Database
+				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+				Process-Users
+				$stopwatch_main.Stop()
+				Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+				Download-Files-From-Database -Type 1
+				$stopwatch_main.Stop()
+				Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			}
+			'DownloadAllMetadata' { 
+				Backup-Database
+				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+				Process-Users-MetadataOnly
+				$stopwatch_main.Stop()
+				Write-Host "`nDownloaded all metadata from users in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			}
+			'DownloadOnlyFiles' { 
+				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+				Download-Files-From-Database -Type 1
+				$stopwatch_main.Stop()
+				Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			}
+			'DownloadFilesFromQuery' {
+				if ([string]::IsNullOrWhiteSpace($Query)) {
+					Write-Host "The -Query parameter is required for the DownloadFilesFromQuery function." -ForegroundColor Red
+				} else {
+					$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+					Download-Files-From-Database -Type 2 -Query $Query
+					$stopwatch_main.Stop()
+					Write-Host "`nDownloaded files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				}
+			}
+			'ScanFolderForFavorites' { 
+				Backup-Database
+				Scan-Folder-And-Add-Files-As-Favorites -Type 4
+			}
+			'DownloadMetadataForSingleUser' {
+				if ([string]::IsNullOrWhiteSpace($Username)) {
+					Write-Host "The -Username parameter is required for the DownloadMetadataForSingleUser function." -ForegroundColor Red
+				} else {
+					Backup-Database
+					$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+					Download-Metadata-From-User -Username $Username -WordFilter $WordFilter -WordFilterExclude $WordFilterExclude
+					$stopwatch_main.Stop()
+					Write-Host "`nDownloaded metadata for user $Username in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				}
+			}
+			default { Write-Host "Invalid function name: $Function" -ForegroundColor Red }
+		}
+##########################################################################
+	} catch {
+		Write-Error "An error occurred (line $($_.InvocationInfo.ScriptLineNumber)): $($_.Exception.Message)"
+	} finally {
+		Stop-Transcript
+		[console]::beep()
+		Pause
+	}
 ##########################################################################
 } else {
     Show-Menu

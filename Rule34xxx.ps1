@@ -769,69 +769,72 @@ function Show-Menu {
 		# Write-Output "Transcript stopped"
 	}
 }
-####################################################
-
-
-
+##########################################################################
 if ($Function) {
-	# Start logging
-	$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
-	Start-Transcript -Path "$PSScriptRoot/logs/Rule34xxx_$($CurrentDate).log" -Append
-    switch ($Function) {
-        'DownloadAllMetadataAndFiles' { 
-            Backup-Database
-            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-            Process-Queries
-            $stopwatch_main.Stop()
-            Write-Host "`nDownloaded all metadata from queries in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-            Download-Files-From-Database -Type 1
-            $stopwatch_main.Stop()
-            Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-        }
-        'DownloadAllMetadata' { 
-            Backup-Database
-            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-            Process-Queries
-            $stopwatch_main.Stop()
-            Write-Host "`nDownloaded all metadata from queries in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-        }
-        'DownloadOnlyFiles' { 
-            $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-            Download-Files-From-Database -Type 1
-            $stopwatch_main.Stop()
-            Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-        }
-        'DownloadFilesFromQuery' {
-            if ([string]::IsNullOrWhiteSpace($Query)) {
-                Write-Host "The -Query parameter is required for the DownloadFilesFromQuery function." -ForegroundColor Red
-            } else {
-                $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-                Download-Files-From-Database -Type 2 -Query $Query
-                $stopwatch_main.Stop()
-                Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-            }
-        }
-        'ScanFolderForFavorites' { 
-            Backup-Database
-            Scan-Folder-And-Add-Files-As-Favorites -Type 1
-        }
-        'DownloadMetadataForSingleQuery' {
-            if ([string]::IsNullOrWhiteSpace($QueryName) -or [string]::IsNullOrWhiteSpace($Query)) {
-                Write-Host "The -QueryName and -Query parameters are required for the DownloadMetadataForSingleQuery function." -ForegroundColor Red
-            } else {
-                Backup-Database
-                $stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
-                Download-Metadata-From-Query -QueryName $QueryName -MinID $MinID -MaxID $MaxID -Results_per_Page $Results_per_Page -Query $Query
-                $stopwatch_main.Stop()
-                Write-Host "`nDownloaded metadata for query '$QueryName' in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
-            }
-        }
-        default { Write-Host "Invalid function name: $Function" -ForegroundColor Red }
-    }
-	Stop-Transcript
-    [console]::beep()
-    Pause
+	try {
+		# Start logging
+		$CurrentDate = Get-Date -Format "yyyyMMdd_HHmmss"
+		Start-Transcript -Path "$PSScriptRoot/logs/Rule34xxx_$($CurrentDate).log" -Append
+		switch ($Function) {
+			'DownloadAllMetadataAndFiles' { 
+				Backup-Database
+				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+				Process-Queries
+				$stopwatch_main.Stop()
+				Write-Host "`nDownloaded all metadata from queries in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+				Download-Files-From-Database -Type 1
+				$stopwatch_main.Stop()
+				Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			}
+			'DownloadAllMetadata' { 
+				Backup-Database
+				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+				Process-Queries
+				$stopwatch_main.Stop()
+				Write-Host "`nDownloaded all metadata from queries in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			}
+			'DownloadOnlyFiles' { 
+				$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+				Download-Files-From-Database -Type 1
+				$stopwatch_main.Stop()
+				Write-Host "`nDownloaded all files from database in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+			}
+			'DownloadFilesFromQuery' {
+				if ([string]::IsNullOrWhiteSpace($Query)) {
+					Write-Host "The -Query parameter is required for the DownloadFilesFromQuery function." -ForegroundColor Red
+				} else {
+					$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+					Download-Files-From-Database -Type 2 -Query $Query
+					$stopwatch_main.Stop()
+					Write-Host "`nDownloaded all files from query in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				}
+			}
+			'ScanFolderForFavorites' { 
+				Backup-Database
+				Scan-Folder-And-Add-Files-As-Favorites -Type 1
+			}
+			'DownloadMetadataForSingleQuery' {
+				if ([string]::IsNullOrWhiteSpace($QueryName) -or [string]::IsNullOrWhiteSpace($Query)) {
+					Write-Host "The -QueryName and -Query parameters are required for the DownloadMetadataForSingleQuery function." -ForegroundColor Red
+				} else {
+					Backup-Database
+					$stopwatch_main = [System.Diagnostics.Stopwatch]::StartNew()
+					Download-Metadata-From-Query -QueryName $QueryName -MinID $MinID -MaxID $MaxID -Results_per_Page $Results_per_Page -Query $Query
+					$stopwatch_main.Stop()
+					Write-Host "`nDownloaded metadata for query '$QueryName' in $($stopwatch_main.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
+				}
+			}
+			default { Write-Host "Invalid function name: $Function" -ForegroundColor Red }
+		}
+##########################################################################
+	} catch {
+		Write-Error "An error occurred (line $($_.InvocationInfo.ScriptLineNumber)): $($_.Exception.Message)"
+	} finally {
+		Stop-Transcript
+		[console]::beep()
+		Pause
+	}
 ##########################################################################
 } else {
     Show-Menu
