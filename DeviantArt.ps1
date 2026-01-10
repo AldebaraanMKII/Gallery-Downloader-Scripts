@@ -229,6 +229,13 @@ function Download-Metadata-From-User {
 					$ContinueFetching = $false
 					return #go to next user
 ########################################################
+				} elseif ($Response.StatusCode -in 400, 404) {
+					Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
+					$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
+					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+					$ContinueFetching = $false
+					return #go to next user
+########################################################
 				} else {
 					Write-Host "(Download-Metadata-From-User 1) An unexpected error occurred: $($Response.error_description)" -ForegroundColor Red
 					$ContinueFetching = $false
@@ -321,6 +328,12 @@ function Download-Metadata-From-User {
 ########################################################
 					} catch {
 						if ($Response.error_code -in 400, 404) {
+							Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
+							$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
+							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+							$ContinueFetching = $false
+							return #go to next user
+						} elseif ($Response.StatusCode -in 400, 404) {
 							Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
 							$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
 							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
