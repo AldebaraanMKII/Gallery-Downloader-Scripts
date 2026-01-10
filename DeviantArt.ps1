@@ -171,33 +171,16 @@ function Download-Metadata-From-User {
 		$retryCount = 0
 		while ($retryCount -lt $maxRetries) {
 			try {
-				# Make the API request and process the JSON response
-				$Response = Invoke-RestMethod -Uri $URL -Method Get
-				# $Response
-########################################################
-				if ($Response.StatusCode -in 400, 404) {
-					Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
-					$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
-					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-					$ContinueFetching = $false
-					return #go to next user
-################################## too many requests, try again
-				} elseif ($Response.StatusCode -in 429, 500) {
-					$delay = Calculate-Delay -retryCount $retryCount
-					
-					$retryCount++
-					
-					Write-Host "error 429/500 encountered. Retrying in $delay milliseconds..." -ForegroundColor Yellow
-					Start-Sleep -Milliseconds $delay
-########################################################
-				} elseif ($Response -and $Response.user.username) {
+				$Json = Invoke-RestMethod -Uri $URL -Method Get
+				# $Response = Invoke-WebRequest -Uri $URL -Method Get -SkipHttpErrorCheck
+				# $Json = $Response.Content | ConvertFrom-Json
+				if ($Json -and $Json.user.username) {
 					Write-Host "User found" -ForegroundColor Green
-					
-					$UserID = $Response.user.userid
-					$Country = $Response.country
+					$UserID = $Json.user.userid
+					$Country = $Json.country
 					#fix backtick issues
 					$Country = $Country -replace "'", ""
-					$User_Deviations = $Response.stats.user_deviations
+					$User_Deviations = $Json.stats.user_deviations
 					
 					$username_url = "https://www.deviantart.com/$($Username)/gallery/all"
 					
@@ -206,42 +189,32 @@ function Download-Metadata-From-User {
 					
 					# Write-Host "`ntemp_query is $temp_query"
 					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-                    
+					
 					Write-Host "New user $Username added to database." -ForegroundColor Green
+					Start-Sleep -Milliseconds 3000
 					break
 				}
-########################################################
+######################################################
 			} catch {
-				if ($Response.error_code -in 0, 1, 2) {
-					Write-Host "User $username not found. Skipping..." -ForegroundColor Red
-					$ContinueFetching = $false
-					break
-########################################################
-				} elseif ($Response.error -eq "invalid_request") {
-					Write-Host "Invalid request: $($Response.error_description)" -ForegroundColor Red
-					$ContinueFetching = $false
-					break
-########################################################
-				} elseif ($Response.error_code -in 400, 404) {
-					Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
+				if ($Json.error_code -in 1,400,404 -or $Json.error_description -eq "Sorry, we have blocked access to this profile.") {
+					Write-Host "User $Username not found (error_code $($Json.error_code)). Marking user as deleted." -ForegroundColor Red
 					$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
 					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 					$ContinueFetching = $false
-					return #go to next user
-########################################################
-				} elseif ($Response.StatusCode -in 400, 404) {
-					Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
-					$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
-					Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-					$ContinueFetching = $false
-					return #go to next user
-########################################################
+					return
+				} elseif ($Json.error_code -eq 429) {
+					$delay = Calculate-Delay -retryCount $retryCount
+					$retryCount++
+					Write-Host "error 429/500 encountered. Retrying in $delay milliseconds..." -ForegroundColor Yellow
+					Start-Sleep -Milliseconds $delay
+######################################################
+######################################################
 				} else {
-					Write-Host "(Download-Metadata-From-User 1) An unexpected error occurred: $($Response.error_description)" -ForegroundColor Red
+					# Write-Host "(Download-Metadata-From-User 1) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
+					Write-Host "(Download-Metadata-From-User 1) Error: $($Json.error) | Description: $($Json.error_description) | Code: $($Json.error_code) | Status: $($Json.status)" -ForegroundColor Red
 					$ContinueFetching = $false
-					break
+					return
 				}
-########################################################
 			}
 ########################################################
 		}
@@ -292,56 +265,40 @@ function Download-Metadata-From-User {
 					$ContinueFetching = $false
 					Write-Host "This user was updated less than $TimeToCheckAgainMetadata seconds ago. Skipping..." -ForegroundColor Yellow
 ########################################################
-				}	else {
+				} else {
 					$URL = "https://www.deviantart.com/api/v1/oauth2/user/profile/$($Username)?ext_collections=1&ext_galleries=1&access_token=$Access_Token"
 					# Make the API request and process the JSON response
+					# Write-Host "URL: $URL." -ForegroundColor Cyan
 					
 					try {
-						$Response = Invoke-RestMethod -Uri $URL -Method Get
-						
-						if ($Response.StatusCode -in 400, 404) {
-							Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
+						$Json = Invoke-RestMethod -Uri $URL -Method Get
+						# $Response = Invoke-WebRequest -Uri $URL -Method Get -SkipHttpErrorCheck
+						# $Json = $Response.Content | ConvertFrom-Json
+						if ($Json -and $Json.stats.user_deviations) {
+							Write-Host "Found user in DeviantArt`s database." -ForegroundColor Yellow
+							$User_Deviations = $Json.stats.user_deviations
+							#update total_user_deviations to current count
+							$temp_query = "UPDATE Users SET total_user_deviations = '$User_Deviations' WHERE username = '$Username'"
+							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+							Start-Sleep -Milliseconds 3000
+						}
+########################################################
+					} catch {
+						if ($Json.error_code -in 1,400,404 -or $Json.error_description -eq "Sorry, we have blocked access to this profile.") {
+							Write-Host "User $Username not found (error_code $($Json.error_code)). Marking user as deleted." -ForegroundColor Red
 							$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
 							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 							$ContinueFetching = $false
 							return
-######################################################## too many requests, try again
-						} elseif ($Response.StatusCode -in 429, 500) {
+						} elseif ($Json.error_code -eq 429) {
 							$delay = Calculate-Delay -retryCount $retryCount
-							
 							$retryCount++
-							
 							Write-Host "error 429/500 encountered. Retrying in $delay milliseconds..." -ForegroundColor Yellow
 							Start-Sleep -Milliseconds $delay
 						} else {
-							Write-Host "Found user in DeviantArt`s database." -ForegroundColor Yellow
-							$User_Deviations = $Response.stats.user_deviations
-							#update total_user_deviations to current count
-							$temp_query = "UPDATE Users SET total_user_deviations = '$User_Deviations' WHERE username = '$Username'"
-							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-########################################################
-							#update the last_time_fetched_metadata column to NULL
-							# $temp_query = "UPDATE Users SET last_time_fetched_metadata = NULL WHERE username = '$Username'"
-							# Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-########################################################
-						}
-########################################################
-					} catch {
-						if ($Response.error_code -in 400, 404) {
-							Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
-							$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
-							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+							Write-Host "(Download-Metadata-From-User 2) Error: $($Json.error) | Description: $($Json.error_description) | Code: $($Json.error_code) | Status: $($Json.status)" -ForegroundColor Red
 							$ContinueFetching = $false
-							return #go to next user
-						} elseif ($Response.StatusCode -in 400, 404) {
-							Write-Output "User $username not found (400/404 error). Marking user as deleted." -ForegroundColor Red
-							$temp_query = "UPDATE Users SET deleted = 1 WHERE username = '$Username'"
-							Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-							$ContinueFetching = $false
-							return #go to next user
-						} else {
-							Write-Host "(Download-Metadata-From-User 2) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
-							$ContinueFetching = $false
+							return
 						}
 					}
 ########################################################
@@ -387,6 +344,7 @@ function Download-Metadata-From-User {
 						Write-Host "Access token expired. Requesting a new one..." -ForegroundColor Red
 						# $Access_Token = Refresh-Access-Token
 						$Access_Token = Refresh-Access-Token-Client-Credentials
+						Start-Sleep -Milliseconds 3000
 					}
 					# $headers = @{
 						# Authorization = "Bearer $Access_Token"
@@ -726,7 +684,7 @@ function Download-Metadata-From-User {
 						Write-Host "error 429/500 encountered. Retrying in $delay milliseconds..." -ForegroundColor Red
 						
 						#increase this by X seconds each time
-						$TimeToWait = $TimeToWait + 500
+						$TimeToWait = $TimeToWait + 100
 						Write-Host "Time to wait between requests increased to $TimeToWait." -ForegroundColor Yellow
 						
 						Start-Sleep -Milliseconds $delay
@@ -742,7 +700,8 @@ function Download-Metadata-From-User {
 						# break
 ########################################################
 					} else {
-						Write-Host "An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
+						# Write-Host "An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
+						Write-Host "(Download-Metadata-From-User 3) Error: $($Response.error) | Description: $($Response.error_description) | Code: $($Response.error_code) | Status: $($Response.status)" -ForegroundColor Red
 						$HasMoreFiles = $false
 						break
 					}
