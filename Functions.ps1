@@ -272,6 +272,7 @@ function Scan-Folder-And-Add-Files-As-Favorites {
         $processedCount += $matchedFiles.Count
         Write-Host "Finished processing $processedCount total files." -ForegroundColor Cyan
     }
+	pause
 }
 ####################################################
 function Process-BatchFiles {
@@ -628,13 +629,13 @@ function Handle-Errors {
 			$retryCount++
 			
 			if ($StatusCode -eq 429) {
-				Write-Host "Error 429: Too Many Requests. Retrying in $delay milliseconds..." -ForegroundColor Red
+				Write-Warning "Error 429: Too Many Requests. Retrying in $delay milliseconds..."
 			} elseif ($StatusCode -eq 500) {
-				Write-Host "Error 500: Internal Server Error. Retrying in $delay milliseconds..." -ForegroundColor Red
+				Write-Warning "Error 500: Internal Server Error. Retrying in $delay milliseconds..."
 			} elseif ($StatusCode -eq 520) {
-				Write-Host "Error 520: Internal Server Error. Retrying in $delay milliseconds..." -ForegroundColor Red
+				Write-Warning "Error 520: Internal Server Error. Retrying in $delay milliseconds..."
 			} elseif ($StatusCode -eq 1015) {
-				Write-Host "Error 1015: Rate limited. Retrying in $delay milliseconds..." -ForegroundColor Red
+				Write-Warning "Error 1015: Rate limited. Retrying in $delay milliseconds..."
 			}
 		
 			Start-Sleep -Milliseconds $delay
@@ -644,15 +645,15 @@ function Handle-Errors {
 #####################################
 		} elseif ($StatusCode -in 404, 401) {
 			if ($StatusCode -eq 404) {
-				Write-Host "(ID: $FileIdentifier) Error 404. This means the file was deleted. It will be set to deleted in the database so that it's not processed again." -ForegroundColor Red
-				$temp_query = "UPDATE Files SET deleted, downloaded = 1 WHERE $DataQuery"
+				Write-Warning "(ID: $FileIdentifier) Error 404. This means the file was deleted. It will be set to deleted in the database so that it's not processed again."
+				$temp_query = "UPDATE Files SET deleted = 1 WHERE $DataQuery"
 				Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 				
 				#it seems now civitai is more agressive with their rate limits. This waits X milliseconds before going to the next file.
 				Start-Sleep -Milliseconds 300
 #####################################
 			} elseif ($StatusCode -eq 401) {
-				Write-Host "(ID: $FileIdentifier) Error 401. This means the file was locked by its creator, and you do not have access to it. It will be set to downloaded in the database so that it's not processed again." -ForegroundColor Red
+				Write-Warning "(ID: $FileIdentifier) Error 401. This means the file was locked by its creator, and you do not have access to it. It will be set to downloaded in the database so that it's not processed again."
 				$temp_query = "UPDATE Files SET downloaded = 1 WHERE $DataQuery"
 				Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 				
@@ -666,7 +667,7 @@ function Handle-Errors {
 		} elseif ($ErrorMessage -like "*Could not find a part of the path*") {
 			$retryCount++
 			
-			Write-Host "$ErrorMessage. Retrying..." -ForegroundColor Red
+			Write-Warning "$ErrorMessage. Retrying..."
 
 			Start-Sleep -Milliseconds $delay
 			
@@ -674,7 +675,7 @@ function Handle-Errors {
 			return $retryCount, $BreakLoop
 #####################################
 		} else {
-			Write-Host "Failed to fetch file (ID: $FileIdentifier) for user $($Username): $($ErrorMessage)" -ForegroundColor Red
+			Write-Warning "Failed to fetch file (ID: $FileIdentifier) for user $($Username): $($ErrorMessage)"
 			$BreakLoop = $true
 			return $retryCount, $BreakLoop
 		}
@@ -1044,18 +1045,20 @@ function Start-Download {
                         }
                     }
                     
+                    
+                    #This was removed because the Handle-Errors function already has a delay
                     # Add delay between retries (with cancellation check)
-                    if ($retryCount -lt $maxRetries -and -not $downloadSuccessful -and -not $handledError) {
-                        $delaySeconds = [Math]::Min(2 * $retryCount, 10)
-                        for ($i = 0; $i -lt $delaySeconds; $i++) {
-                            if ($CancellationToken.IsCancellationRequested) {
-                                $result.Cancelled = $true
-                                $result.Message = "Download cancelled"
-                                return $result
-                            }
-                            Start-Sleep -Seconds 1
-                        }
-                    }
+                    # if ($retryCount -lt $maxRetries -and -not $downloadSuccessful -and -not $handledError) {
+                    #     $delaySeconds = [Math]::Min(2 * $retryCount, 10)
+                    #     for ($i = 0; $i -lt $delaySeconds; $i++) {
+                    #         if ($CancellationToken.IsCancellationRequested) {
+                    #             $result.Cancelled = $true
+                    #             $result.Message = "Download cancelled"
+                    #             return $result
+                    #         }
+                    #         Start-Sleep -Seconds 1
+                    #     }
+                    # }
                 }
                 
                 # Set the appropriate result message
@@ -1329,7 +1332,7 @@ function Check-if-Access-Token-Expired {
 					return $true
 				}	else {
 					$TimeToExpire = 3600 - $SecondsDifference
-					Write-Host "`nAccess token will expire in $TimeToExpire seconds." -ForegroundColor Yellow
+					Write-Host "Access token will expire in $TimeToExpire seconds." -ForegroundColor Yellow
 					return $false
 				}
 ########################

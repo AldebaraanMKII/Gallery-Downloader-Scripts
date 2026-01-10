@@ -353,7 +353,7 @@ function Download-Metadata-From-User {
 					# $Access_Token = "5c3ce678136a4fdb86afbff500771e8d2348e03bf53bfe3625"
 					
 					$URLConsole = "https://www.deviantart.com/api/v1/oauth2/gallery/all?username=$($Username)&offset=$($Cur_Offset)&limit=$($Limit)&mature_content=$($AllowMatureContent)&access_token=access_token_here"
-					Write-Host "`nURL: $URLConsole" -ForegroundColor Yellow
+					Write-Host "URL: $URLConsole" -ForegroundColor Yellow
 					
 					$URL = "https://www.deviantart.com/api/v1/oauth2/gallery/all?username=$($Username)&offset=$($Cur_Offset)&limit=$($Limit)&mature_content=$($AllowMatureContent)&access_token=$Access_Token"
 					# $Response = Invoke-RestMethod -Uri $URL -Method Get -Headers $headers
