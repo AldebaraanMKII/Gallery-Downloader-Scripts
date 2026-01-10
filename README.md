@@ -1,5 +1,5 @@
 # Attention!
-If are using a database made before commit [4b560e1e]([https://pages.github.com/](https://github.com/AldebaraanMKII/Gallery-Downloader-Scripts/commit/4b560e1e68db5deeba817404bc1195960fdbc355)), then you need to update it by running these sql queries (i recommend HeidiSQL):
+If are using a database made before commit [4b560e1e](https://github.com/AldebaraanMKII/Gallery-Downloader-Scripts/commit/4b560e1e68db5deeba817404bc1195960fdbc355), then you need to update it by running these sql queries (i recommend HeidiSQL):
 
 CivitAI/DeviantArt:
 ```
