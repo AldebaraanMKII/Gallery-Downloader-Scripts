@@ -487,56 +487,6 @@ function Download-Metadata-From-User {
 ############################################
 }
 ############################################
-#create database file if it doesn`t exist
-if (-not (Test-Path $DBFilePath)) {
-	
-	$createTableQuery = "CREATE TABLE Users (
-		username TEXT PRIMARY KEY,
-		url TEXT,
-		total_files INTEGER DEFAULT 0,
-		cur_cursor TEXT,
-		last_time_fetched_metadata TEXT,
-		last_time_downloaded TEXT,
-		deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
-		);
-		"
-	
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-	
-	$createTableQuery = "CREATE TABLE Files (
-		id INTEGER PRIMARY KEY,
-		filename TEXT,
-		extension TEXT,
-		width INTEGER,
-		height INTEGER,
-		url TEXT,
-		createdAt TEXT,
-		postId INTEGER DEFAULT 0,
-		username TEXT,
-		rating TEXT,
-		meta_size TEXT,
-		meta_seed INTEGER DEFAULT 0,
-		meta_model TEXT,
-		meta_steps INTEGER DEFAULT 0,
-		meta_prompt TEXT,
-		meta_sampler TEXT,
-		meta_cfgScale INTEGER DEFAULT 0,
-		meta_clip_skip INTEGER DEFAULT 0,
-		meta_hires_upscale INTEGER DEFAULT 0,
-		meta_hires_upscaler TEXT,
-		meta_negativePrompt TEXT,
-		meta_denoising_strength FLOAT DEFAULT 0,
-		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-		favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-		deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
-		);
-		"
-		
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-}
-
-
-############################################
 function Process-Users {
 	# Loop through the user list and download files
 	foreach ($User in $UserList) {
@@ -547,6 +497,9 @@ function Process-Users {
 		# Start-Sleep -Milliseconds $TimeToWait
 	}
 }
+############################################
+#create database file if it doesn`t exist
+Create-Database-If-It-Doesnt-Exist -SiteName "CivitAI" -DBFilePath $DBFilePath
 ############################################
 function Show-Menu {
     param (

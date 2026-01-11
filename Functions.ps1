@@ -1495,3 +1495,182 @@ function Refresh-Access-Token-Client-Credentials {
 ####################################
 }
 ####################################
+function Create-Database-If-It-Doesnt-Exist {
+	param (
+        [string]$SiteName,  # Site name (e.g., "Gelbooru", "CivitAI", etc.)
+        [string]$DBFilePath	# database path
+    )
+	
+	#check if database exists
+	if (-not (Test-Path $DBFilePath)) {
+########################################################################
+		#create database file
+		if ($SiteName = "CivitAI") {
+			$createTableQuery = "CREATE TABLE Users (
+				username TEXT PRIMARY KEY,
+				url TEXT,
+				total_files INTEGER DEFAULT 0,
+				cur_cursor TEXT,
+				last_time_fetched_metadata TEXT,
+				last_time_downloaded TEXT,
+				deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
+				);
+				"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+			
+			$createTableQuery = "CREATE TABLE Files (
+				id INTEGER PRIMARY KEY,
+				filename TEXT,
+				extension TEXT,
+				width INTEGER,
+				height INTEGER,
+				url TEXT,
+				createdAt TEXT,
+				postId INTEGER DEFAULT 0,
+				username TEXT,
+				rating TEXT,
+				meta_size TEXT,
+				meta_seed INTEGER DEFAULT 0,
+				meta_model TEXT,
+				meta_steps INTEGER DEFAULT 0,
+				meta_prompt TEXT,
+				meta_sampler TEXT,
+				meta_cfgScale INTEGER DEFAULT 0,
+				meta_clip_skip INTEGER DEFAULT 0,
+				meta_hires_upscale INTEGER DEFAULT 0,
+				meta_hires_upscaler TEXT,
+				meta_negativePrompt TEXT,
+				meta_denoising_strength FLOAT DEFAULT 0,
+				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+				favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+				deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+				);
+				"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+########################################################################
+		} elseif ($SiteName = "DeviantArt") {
+			$createTableQuery = "CREATE TABLE Auth (
+				access_token TEXT,
+				access_token_creation_date TEXT,
+				refresh_token TEXT,
+				refresh_token_creation_date TEXT
+				);"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+			
+			$createTableQuery = "CREATE TABLE Users (
+				username TEXT PRIMARY KEY,
+				userID TEXT,
+				url TEXT,
+				country TEXT,
+				deviations_in_database INTEGER DEFAULT 0,
+				locked_deviations INTEGER DEFAULT 0,
+				total_user_deviations INTEGER DEFAULT 0,
+				last_time_fetched_metadata TEXT,
+				last_time_downloaded TEXT,
+				cur_offset INTEGER DEFAULT 0,
+				deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
+				);"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+			
+			$createTableQuery = "CREATE TABLE Files (
+				deviationID TEXT PRIMARY KEY,
+				url TEXT,
+				src_url TEXT,
+				extension TEXT,
+				width INTEGER,
+				height INTEGER,
+				title TEXT,
+				username TEXT,
+				published_time TEXT,
+				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+				favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+				deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+				);"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+########################################################################
+		} elseif ($SiteName = "Kemono") {
+			$createTableQuery = "CREATE TABLE Creators (
+				creatorID TEXT PRIMARY KEY,
+				creatorName TEXT,
+				service TEXT,
+				date_indexed TEXT,
+				date_updated TEXT,
+				last_time_fetched_metadata TEXT,
+				last_time_downloaded TEXT,
+				page_offset INTEGER DEFAULT 0),
+				deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
+				);"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+			
+			$createTableQuery = "CREATE TABLE Posts (
+				postID TEXT PRIMARY KEY,
+				creatorName TEXT,
+				title TEXT,
+				content TEXT,
+				total_files INTEGER DEFAULT 0,
+				date_published TEXT,
+				date_added TEXT,
+				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+				);"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+			
+			$createTableQuery = "CREATE TABLE Files (
+				hash TEXT PRIMARY KEY,
+				hash_extension TEXT,
+				filename TEXT,
+				filename_extension TEXT,
+				url TEXT,
+				file_index INTEGER DEFAULT 0,
+				creatorName TEXT,
+				postID TEXT,
+				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+				favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+				deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+				);"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+########################################################################
+		} elseif ($SiteName = "Rule34xxx") {
+			$createTableQuery = "CREATE TABLE Queries (
+				query TEXT PRIMARY KEY,
+				query_name TEXT,
+				results_per_page INTEGER DEFAULT 1000,
+				minID INTEGER DEFAULT -1,
+				maxID INTEGER DEFAULT -1,
+				last_id INTEGER DEFAULT 0,
+				last_time_fetched_metadata TEXT,
+				last_time_downloaded TEXT
+				);"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+			
+			$createTableQuery = "CREATE TABLE Files (
+				id INTEGER PRIMARY KEY,
+				url TEXT,
+				hash TEXT,
+				extension TEXT,
+				width INTEGER DEFAULT 0,
+				height INTEGER DEFAULT 0,
+				createdAt TEXT,
+				source TEXT,
+				main_tag TEXT,
+				tags_artist TEXT,
+				tags_character TEXT,
+				tags_general TEXT,
+				tags_copyright TEXT,
+				tags_meta TEXT,
+				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+				favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
+				deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+				);"
+			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
+########################################################################
+		} else {
+			Write-Host "Invalid Site name for database creation." -ForegroundColor Red
+		}
+########################################################################
+	}
+########################################################################
+}
+
+
+
+########################################################################

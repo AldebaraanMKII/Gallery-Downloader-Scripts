@@ -710,52 +710,8 @@ function Download-Metadata-From-Creator {
 }
 ############################################
 #create database file if it doesn`t exist
-if (-not (Test-Path $DBFilePath)) {
-	$createTableQuery = "CREATE TABLE Creators (
-		creatorID TEXT PRIMARY KEY,
-		creatorName TEXT,
-		service TEXT,
-		date_indexed TEXT,
-		date_updated TEXT,
-		last_time_fetched_metadata TEXT,
-		last_time_downloaded TEXT,
-		page_offset INTEGER DEFAULT 0),
-		deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1)));
-		"
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-	
-	
-	$createTableQuery = "CREATE TABLE Posts (
-		postID TEXT PRIMARY KEY,
-		creatorName TEXT,
-		title TEXT,
-		content TEXT,
-		total_files INTEGER DEFAULT 0,
-		date_published TEXT,
-		date_added TEXT,
-		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)))
-		"
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-	
-
-	$createTableQuery = "CREATE TABLE Files (
-		hash TEXT PRIMARY KEY,
-		hash_extension TEXT,
-		filename TEXT,
-		filename_extension TEXT,
-		url TEXT,
-		file_index INTEGER DEFAULT 0,
-		creatorName TEXT,
-		postID TEXT,
-		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-		favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-		deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
-		);
-		"
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-}
-
-###############################
+Create-Database-If-It-Doesnt-Exist -SiteName "Kemono" -DBFilePath $DBFilePath
+############################################
 
 
 ############################################

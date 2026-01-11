@@ -567,43 +567,8 @@ function Download-Metadata-From-Query {
 }
 ############################################
 #create database file if it doesn`t exist
-if (-not (Test-Path $DBFilePath)) {
-	$createTableQuery = "CREATE TABLE Queries (
-		query TEXT PRIMARY KEY,
-		query_name TEXT,
-		results_per_page INTEGER DEFAULT 1000,
-		minID INTEGER DEFAULT -1,
-		maxID INTEGER DEFAULT -1,
-		last_id INTEGER DEFAULT 0,
-		last_time_fetched_metadata TEXT,
-		last_time_downloaded TEXT
-		)"
-	
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-	
-	$createTableQuery = "CREATE TABLE Files (
-		id INTEGER PRIMARY KEY,
-		url TEXT,
-		hash TEXT,
-		extension TEXT,
-		width INTEGER DEFAULT 0,
-		height INTEGER DEFAULT 0,
-		createdAt TEXT,
-		source TEXT,
-		main_tag TEXT,
-		tags_artist TEXT,
-		tags_character TEXT,
-		tags_general TEXT,
-		tags_copyright TEXT,
-		tags_meta TEXT,
-		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-		favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-		deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
-		)"
-	
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-}
-
+Create-Database-If-It-Doesnt-Exist -SiteName "Rule34xxx" -DBFilePath $DBFilePath
+############################################
 
 ###############################
 ## have to load tags from database and make a list from them

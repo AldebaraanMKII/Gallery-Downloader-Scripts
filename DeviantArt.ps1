@@ -718,50 +718,6 @@ function Download-Metadata-From-User {
 ########################################################
 
 
-############################################
-#create database file if it doesn`t exist
-if (-not (Test-Path $DBFilePath)) {
-	$createTableQuery = "CREATE TABLE Auth (
-		access_token TEXT,
-		access_token_creation_date TEXT,
-		refresh_token TEXT,
-		refresh_token_creation_date TEXT
-		);"
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-	
-	$createTableQuery = "CREATE TABLE Users (
-		username TEXT PRIMARY KEY,
-		userID TEXT,
-		url TEXT,
-		country TEXT,
-		deviations_in_database INTEGER DEFAULT 0,
-		locked_deviations INTEGER DEFAULT 0,
-		total_user_deviations INTEGER DEFAULT 0,
-		last_time_fetched_metadata TEXT,
-		last_time_downloaded TEXT,
-		cur_offset INTEGER DEFAULT 0,
-		deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
-		);"
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-	
-	$createTableQuery = "CREATE TABLE Files (
-		deviationID TEXT PRIMARY KEY,
-		url TEXT,
-		src_url TEXT,
-		extension TEXT,
-		width INTEGER,
-		height INTEGER,
-		title TEXT,
-		username TEXT,
-		published_time TEXT,
-		downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-		favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-		deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
-		);"
-	Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
-}
-############################################
-
 
 ############################################
 function Process-Users {
@@ -793,8 +749,9 @@ function Process-Users-MetadataOnly {
 	}
 }
 ############################################
-####################################
-####################################
+#create database file if it doesn`t exist
+Create-Database-If-It-Doesnt-Exist -SiteName "DeviantArt" -DBFilePath $DBFilePath
+############################################
 $RefreshTokenExpired = Check-if-Refresh-Token-Expired
 #expired
 if ($RefreshTokenExpired) {
