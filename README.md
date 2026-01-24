@@ -7,6 +7,12 @@ ALTER TABLE Users
 ADD COLUMN deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1));
 ```
 
+DeviantArt:
+```
+ALTER TABLE Files
+ADD COLUMN locked INTEGER DEFAULT 0 CHECK (locked IN (0,1));
+```
+
 Kemono:
 ```
 ALTER TABLE Creators
