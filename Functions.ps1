@@ -653,9 +653,13 @@ function Handle-Errors {
 				Start-Sleep -Milliseconds 300
 #####################################
 			} elseif ($StatusCode -eq 401) {
-				Write-Warning "(ID: $FileIdentifier) Error 401. This means the file was locked by its creator, and you do not have access to it. It will be set to locked in the database so that it's not processed again."
-				$temp_query = "UPDATE Files SET locked = 1 WHERE $DataQuery"
-
+				if ($Site = "DeviantArt") {
+					Write-Warning "(ID: $FileIdentifier) Error 401. This means the file was locked by its creator, and you do not have access to it. It will be set to locked in the database so that it's not processed again."
+					$temp_query = "UPDATE Files SET locked = 1 WHERE $DataQuery"
+				} else {
+					Write-Warning "(ID: $FileIdentifier) Error 401. This means the file was locked by its creator, and you do not have access to it. It will be set to downloaded in the database so that it's not processed again."
+					$temp_query = "UPDATE Files SET downloaded = 1 WHERE $DataQuery"
+				}
 				Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 				
 				#This waits X milliseconds before going to the next file.
