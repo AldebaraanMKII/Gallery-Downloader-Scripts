@@ -1514,8 +1514,7 @@ function Create-Database-If-It-Doesnt-Exist {
 				last_time_fetched_metadata TEXT,
 				last_time_downloaded TEXT,
 				deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
-				);
-				"
+				);"
 			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 			
 			$createTableQuery = "CREATE TABLE Files (
@@ -1542,10 +1541,9 @@ function Create-Database-If-It-Doesnt-Exist {
 				meta_negativePrompt TEXT,
 				meta_denoising_strength FLOAT DEFAULT 0,
 				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-				favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-				deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
-				);
-				"
+				favorite INTEGER DEFAULT 0 CHECK (favorite IN (0,1)),
+				deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
+				);"
 			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 ########################################################################
 		} elseif ($SiteName = "DeviantArt") {
@@ -1583,8 +1581,9 @@ function Create-Database-If-It-Doesnt-Exist {
 				username TEXT,
 				published_time TEXT,
 				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-				favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-				deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+				favorite INTEGER DEFAULT 0 CHECK (favorite IN (0,1)),
+				locked INTEGER DEFAULT 0 CHECK (locked IN (0,1)),
+				deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
 				);"
 			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 ########################################################################
@@ -1624,8 +1623,8 @@ function Create-Database-If-It-Doesnt-Exist {
 				creatorName TEXT,
 				postID TEXT,
 				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-				favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-				deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+				favorite INTEGER DEFAULT 0 CHECK (favorite IN (0,1)),
+				deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
 				);"
 			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 ########################################################################
@@ -1658,8 +1657,8 @@ function Create-Database-If-It-Doesnt-Exist {
 				tags_copyright TEXT,
 				tags_meta TEXT,
 				downloaded INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-				favorite INTEGER DEFAULT 0 CHECK (downloaded IN (0,1)),
-				deleted INTEGER DEFAULT 0 CHECK (downloaded IN (0,1))
+				favorite INTEGER DEFAULT 0 CHECK (favorite IN (0,1)),
+				deleted INTEGER DEFAULT 0 CHECK (deleted IN (0,1))
 				);"
 			Invoke-SQLiteQuery -Database $DBFilePath -Query $createTableQuery
 ########################################################################
