@@ -938,11 +938,11 @@ if ($Function) {
 	} finally {
 		Stop-Transcript
 		[console]::beep()
-		Pause
+		# Pause
 	}
 ##########################################################################
 } else {
     Show-Menu
     [console]::beep()
-    Pause
+    # Pause
 }

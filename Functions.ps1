@@ -272,7 +272,7 @@ function Scan-Folder-And-Add-Files-As-Favorites {
         $processedCount += $matchedFiles.Count
         Write-Host "Finished processing $processedCount total files." -ForegroundColor Cyan
     }
-	pause
+	# pause
 }
 ####################################################
 function Process-BatchFiles {
@@ -960,7 +960,7 @@ function Start-Download {
                             if ($StatusCode -eq 404) {
                                 $handledErrorMessage = "File was deleted (404 error) - marked as deleted in database"
                             } elseif ($StatusCode -eq 401) {
-                                $handledErrorMessage = "File is locked/private (401 error) - marked as downloaded in database"
+                                $handledErrorMessage = "File is locked/private (401 error) - marked as locked in database"
                             } else {
                                 $handledErrorMessage = "HTTP Error $StatusCode`: $ErrorMessage"
                             }
@@ -1042,7 +1042,7 @@ function Start-Download {
                             if ($StatusCode -eq 404) {
                                 $handledErrorMessage = "File was deleted (404 error) - marked as deleted in database"
                             } elseif ($StatusCode -eq 401) {
-                                $handledErrorMessage = "File is locked/private (401 error) - marked as downloaded in database"
+                                $handledErrorMessage = "File is locked/private (401 error) - marked as locked in database"
                             } else {
                                 $handledErrorMessage = "General Error (Status: $StatusCode): $ErrorMessage"
                             }
