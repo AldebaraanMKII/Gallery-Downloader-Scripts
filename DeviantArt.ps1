@@ -499,7 +499,7 @@ function Download-Metadata-From-User {
 												Write-Host "Added File $DeviationID ($FileTitle) ($FileExtension) to database." -ForegroundColor Green
 ################################################################################
 											#videos
-											} elseif ($File.PSObject.Properties['videos']) {
+											} elseif ($File.PSObject.Properties['videos'] -and $File.videos.Count -gt 0) {
 												# Write-Output "Found video"
 												#get the highest quality video
 												$highestResolutionVideo = $File.videos | Sort-Object { [int]($_.quality -replace 'p', '') } -Descending | Select-Object -First 1
