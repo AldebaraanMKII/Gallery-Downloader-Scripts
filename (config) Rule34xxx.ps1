@@ -1,4 +1,4 @@
-#######################################
+###############################
 # Folder where Files will be downloaded
 $DownloadFolder = ""
 $FavoriteScanFolder = ""
@@ -11,6 +11,9 @@ $DownloadBaseURL = "https://api-cdn.rule34.xxx/images/"
 # API Credentials - Required
 $API_Key = ""
 $UserID = ""
+###############################
+#Sets PRAGMA default_cache_size. Increases RAM usage but decreases disk I/O. Default for sqlite is 2000 (pages). Set it to negative to use KB instead of pages.
+$PRAGMA_default_cache_size = 20000
 ###############################
 $DBFilename = "Rule34xxx.sqlite3"
 $DBFilePath = "$PSScriptRoot/$DBFilename"

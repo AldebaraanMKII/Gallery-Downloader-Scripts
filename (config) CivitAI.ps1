@@ -1,22 +1,25 @@
 
-###############
+###############################
 # Folder where files will be downloaded
 $DownloadFolder = ""
 $FavoriteScanFolder = ""
-###############
+###############################
 # API endpoint and other settings
 $BaseURL = "https://civitai.com/api/v1/images"
 $DownloadBaseURL = "https://image.civitai.com/"
-###############
+###############################
 $DBFilename = "CivitAI.sqlite3"
 $DBFilePath = "$PSScriptRoot/$DBFilename"
-###############
+###############################
 # API key for authentication
 $API_Key = ""
-###############
+###############################
 #metadata fetch per request, minimum 1 maximum 200
 $Limit = 200
-###############
+###############################
+#Sets PRAGMA default_cache_size. Increases RAM usage but decreases disk I/O. Default for sqlite is 2000 (pages). Set it to negative to use KB instead of pages.
+$PRAGMA_default_cache_size = 20000
+###############################
 # Here you can choose how the output file will be named
 # available options are: %Username%, %FileID%, %Filename%, %FileWidth%, %FileHeight%, %FileCreatedAt% (format: yyyy-mm-dd)
 #e.g. [Username1] [123456] 0001-0002-0003 (2024-08-24)
@@ -25,7 +28,7 @@ $FilenameTemplate = "[%Username%] (%FileID%) %Filename% (%FileCreatedAt%)"
 $maxRetries = 5
 $initialDelay = 5000  # Initial delay in milliseconds
 $MaxDelay = 60000  # max delay in milliseconds
-###############
+###############################
 # this is the amount of file skips that will abort the current user search. Set it to 0 to disable this.
 $MaxSkipsBeforeAborting = 50
 ###############################

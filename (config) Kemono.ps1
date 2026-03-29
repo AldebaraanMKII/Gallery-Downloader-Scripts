@@ -1,20 +1,22 @@
-###############
+###############################
 # Folder where files will be downloaded
 $DownloadFolder = ""
 $FavoriteScanFolder = ""
-###############
+###############################
 # API endpoint and other settings
 $BaseURL = "https://kemono.cr/api/v1"
 $DownloadBaseURL = "https://n1.kemono.cr/data"
-###############
+###############################
 $DBFilename = "Kemono.sqlite3"
 $DBFilePath = "$PSScriptRoot/$DBFilename"
-###############
+###############################
+#Sets PRAGMA default_cache_size. Increases RAM usage but decreases disk I/O. Default for sqlite is 2000 (pages). Set it to negative to use KB instead of pages.
+$PRAGMA_default_cache_size = 20000
+###############################
 # Here you can choose how the output file will be named
 # available options are: %CreatorID%, %CreatorName%, %PostID%, %PostTitle%, %PostPublishDate% (format: yyyy-mm-dd hh-mm-ss), %PostPublishDateShort% (format: yyyy-mm-dd), %FileHash%, %Filename%, %FileIndex%, %PostTotalFiles%
 #e.g. [Username1] [123456] (Commission 1) (1 of 3) 00479-123456 (dd83b728c14d0ea0c8cd3ebb986e3ab2ad6eb7a4c44e2942bb232eefb1d3e41b) (2024-06-24)
 $FilenameTemplate = "[%CreatorName%] [%PostID%] (%PostTitle%) (%FileIndex% of %PostTotalFiles%) %FileHash% (%PostPublishDateShort%)"
-
 ###############################
 ###### http response error handling
 $maxRetries = 5

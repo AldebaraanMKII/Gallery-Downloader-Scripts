@@ -781,6 +781,11 @@ function Process-Users-MetadataOnly {
 ############################################
 #create database file if it doesn`t exist
 Create-Database-If-It-Doesnt-Exist -SiteName "DeviantArt" -DBFilePath $DBFilePath
+#Set the defaults for DB
+$temp_query = "PRAGMA default_cache_size = $PRAGMA_default_cache_size;"
+Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+$temp_query = "PRAGMA journal_mode = WAL;"
+Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 ############################################
 $RefreshTokenExpired = Check-if-Refresh-Token-Expired
 #expired

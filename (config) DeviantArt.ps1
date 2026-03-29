@@ -17,6 +17,9 @@ $redirect_uri = "https://mikf.github.io/gallery-dl/oauth-redirect.html"	#using g
 $scope = "browse feed message note stash user user.manage comment.post collection"  # Or other scopes as required
 $state = ""  # Optional
 ###############################
+#Sets PRAGMA default_cache_size. Increases RAM usage but decreases disk I/O. Default for sqlite is 2000 (pages). Set it to negative to use KB instead of pages.
+$PRAGMA_default_cache_size = 20000
+###############################
 # Here you can choose how the output file will be named
 # available options are: %Username%, %DeviationID%, %Height%, %Width%, %Title%, %PublishedTime% (format: yyyy-mm-dd HH-mm-ss), %PublishedTimeFormatted% (format: yyyy-mm-dd)
 #e.g. [Username1] (AAAAA-BBBBB-CCCCC-DDDDD) whatever-0001 (2024-08-24)
