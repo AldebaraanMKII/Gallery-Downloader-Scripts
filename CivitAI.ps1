@@ -505,6 +505,8 @@ $temp_query = "PRAGMA default_cache_size = $PRAGMA_default_cache_size;"
 Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 $temp_query = "PRAGMA journal_mode = WAL;"
 Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+$temp_query = "PRAGMA synchronous = NORMAL;"
+Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 ############################################
 function Show-Menu {
     param (
