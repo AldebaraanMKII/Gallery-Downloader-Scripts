@@ -1250,7 +1250,7 @@ function Start-Download {
         Write-Host "All downloads completed!" -ForegroundColor Green
     }
 }
-######################################
+############################################
 
 ############################################
 function Check-if-Refresh-Token-Expired {
@@ -1351,8 +1351,32 @@ function Check-if-Access-Token-Expired {
 	}
 ########################
 }
-########################
+############################################
+# Generate a random code_verifier (64 characters)
+function New-CodeVerifier {
+    param([int]$length = 64)
+    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
+    $verifier = -join (1..$length | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
+    return $verifier
+}
+############################################
+# Generate the code_challenge (S256 method)
+function New-CodeChallenge {
+    param([string]$code_verifier)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($code_verifier)
+    $hash = $sha256.ComputeHash($bytes)
 
+    # Base64 URL-safe encoding (RFC 7636)
+    $challenge = [Convert]::ToBase64String($hash) -replace '\+', '-' -replace '/', '_' -replace '=', ''
+    return $challenge
+}
+############################################
+# Usage
+# $code_verifier = New-CodeVerifier
+# $code_challenge = New-CodeChallenge -code_verifier $code_verifier
+# Write-Host "Code Verifier: $code_verifier"
+# Write-Host "Code Challenge: $code_challenge"
 ########################
 # All access_token's expire after 1 hour, after expiration you either need to re-authorize the app or refresh your access token using the refresh_token from the /token request.
 # The refresh_token will expire after 3 months, after that time you must re-authorize the app. 
@@ -1360,7 +1384,11 @@ function Check-if-Access-Token-Expired {
 function Get-Tokens-From-Authorization-Code {
 	Write-Host "`nRefresh token expired or doesn't exist. Getting a new one..." -ForegroundColor Yellow
 	
-	$authUrl = "https://www.deviantart.com/oauth2/authorize?response_type=code&client_id=$client_id&redirect_uri=$redirect_uri&scope=$scope&state=$state"
+	#2.0
+	# $authUrl = "https://www.deviantart.com/oauth2/authorize?response_type=code&client_id=$client_id&redirect_uri=$redirect_uri&scope=$scope&state=$state"
+	#2.1
+	$authUrl = "https://www.deviantart.com/oauth2/authorize?response_type=code&client_id=$client_id&redirect_uri=$redirect_uri&scope=$scope&state=$state&code_challenge=$code_challenge&code_challenge_method=S256"
+
 
 	Write-Host "Opening default browser and redirecting to authorization URL..." -ForegroundColor Yellow
 	Write-Host "After the authorization is complete, copy the code and paste it into the console." -ForegroundColor Yellow
@@ -1376,6 +1404,7 @@ function Get-Tokens-From-Authorization-Code {
 			client_secret = $client_secret
 			redirect_uri = $redirect_uri
 			code = $AuthorizationCode
+			code_verifier = $code_verifier
 		}
 ####################################
 		try {
