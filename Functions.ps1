@@ -1312,7 +1312,47 @@ function Check-if-Access-Token-Expired {
 		#no access token found
 		return $true
 ########################
-	}	else {
+	} else {
+		$temp_query = "SELECT access_token FROM Auth"
+		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+		
+		if ($result.Count -gt 0) {
+			$Access_token = $result[0].access_token
+			try {
+				$Response = Invoke-RestMethod -Uri "https://www.deviantart.com/api/v1/oauth2/placebo?access_token=$access_token" -Method Get
+				
+				if ($Response.error) {
+					$Error = $Response.error
+					$ErrorDescription = $Response.error_description
+					Write-Host "error: $Error" -ForegroundColor Red
+					Write-Host "error description: $ErrorDescription" -ForegroundColor Red
+					return $true
+				} else {
+					Write-Host "Access token is valid." -ForegroundColor Green
+					return $false
+				}
+			} catch {
+				Write-Host "Access token is expired or invalid (HTTP 401)." -ForegroundColor Yellow
+				return $true
+			}
+		} else {
+			#no access token found
+			return $true
+		}
+	}
+}
+############################################
+function Check-if-Access-Token-Expired-Date {
+	$temp_query = "SELECT EXISTS(SELECT 1 from Auth WHERE access_token IS NOT NULL);"
+	$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+	$exists = $result."EXISTS(SELECT 1 from Auth WHERE access_token IS NOT NULL)"
+########################
+	# Check the result
+	if (!$exists) {
+		#no access token found
+		return $true
+########################
+	} else {
 		#access token found, check if it expired
 		$temp_query = "SELECT access_token_creation_date FROM Auth"
 		$result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
@@ -1325,7 +1365,7 @@ function Check-if-Access-Token-Expired {
 				# Ensure both dates are DateTime objects
 				$CurrentDate = [datetime]::ParseExact((Get-Date -Format "yyyy-MM-dd HH:mm:ss"), "yyyy-MM-dd HH:mm:ss", $null)
 				$DateCreated = [datetime]::ParseExact($DateCreated, "yyyy-MM-dd HH:mm:ss", $null)
-
+		
 				# Write-Host "CurrentDate: $CurrentDate"
 				# Write-Host "DateCreated: $DateCreated"
 				
@@ -1410,13 +1450,18 @@ function Get-Tokens-From-Authorization-Code {
 		try {
 			$CurrentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 			$Response = Invoke-RestMethod -Uri "https://www.deviantart.com/oauth2/token" -Method Post -Body $body
-			# $Response
+			# $Response | Format-List *
 			
+			$SucessStatus = $Response.status
 			#this expires in one hour
 			$Access_Token = $Response.access_token
 			#this expires in 3 months
 			$Refresh_Token = $Response.refresh_token
 			# return $access_token, $refresh_token
+			
+			Write-Host "status: $SucessStatus" -ForegroundColor White
+			Write-Host "Refresh_Token: $Refresh_Token" -ForegroundColor White
+			Write-Host "Access_Token: $Access_Token" -ForegroundColor White
 			
 			$temp_query = "SELECT EXISTS(SELECT 1 from Auth WHERE refresh_token IS NOT NULL);"
 			$result = Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
@@ -1468,6 +1513,7 @@ function Refresh-Access-Token {
 		client_id = $client_id
 		client_secret = $client_secret
 		refresh_token = $Refresh_Token
+		# code_verifier = $code_verifier
 	}
 	
 	try {
@@ -1475,8 +1521,20 @@ function Refresh-Access-Token {
 		$refreshResponse = Invoke-RestMethod -Uri "https://www.deviantart.com/oauth2/token" -Method Post -Body $body
 		# $refreshResponse
 		
+		$SucessStatus = $refreshResponse.status
 		$Access_Token = $refreshResponse.access_token
-		$temp_query = "UPDATE Auth SET access_token = '$Access_Token', access_token_creation_date = '$CurrentDate'"
+		
+		Write-Host "status: $SucessStatus" -ForegroundColor White
+		Write-Host "Access_Token: $Access_Token" -ForegroundColor White
+
+		# Ensure the row exists or update it
+		$check_query = "SELECT COUNT(*) as count FROM Auth"
+		$countResult = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $check_query
+		if ($countResult[0].count -eq 0) {
+			$temp_query = "INSERT INTO Auth (access_token, access_token_creation_date) VALUES ('$Access_Token', '$CurrentDate')"
+		} else {
+			$temp_query = "UPDATE Auth SET access_token = '$Access_Token', access_token_creation_date = '$CurrentDate'"
+		}
 		Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
 		return $Access_Token
 ########################
@@ -1494,39 +1552,102 @@ function Refresh-Access-Token {
 }
 ####################################
 # If the access_token expires after 1 hour, you can refresh it using the refresh_token.
-function Refresh-Access-Token-Client-Credentials {
-	# $temp_query = "SELECT refresh_token FROM Auth"
-	# $result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
-	# $Refresh_Token = $result[0].refresh_token
-	
-	# Write-Host "(Refresh-Access-Token) refresh token: $Refresh_Token" -ForegroundColor Yellow
-	$body = @{
-		grant_type = "client_credentials"
-		client_id = $client_id
-		client_secret = $client_secret
-	}
-	
-	try {
-		$CurrentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-		$refreshResponse = Invoke-RestMethod -Uri "https://www.deviantart.com/oauth2/token" -Method Post -Body $body
-		# $refreshResponse
-		
-		$Access_Token = $refreshResponse.access_token
-		$temp_query = "UPDATE Auth SET access_token = '$Access_Token', access_token_creation_date = '$CurrentDate'"
-		Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
-		return $Access_Token
-########################
-	} catch {
-		if ($_.Exception.Response.StatusCode -eq 400) {
-			Write-Host "(Refresh-Access-Token) Received error code 400. This propably means the refresh token is invalid." -ForegroundColor Red
-			# Attempt to get a new token
-			$Access_Token = Get-Tokens-From-Authorization-Code
-			return $Access_Token
-		} else {
-			Write-Host "(Refresh-Access-Token) An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
-		}
-	}
-####################################
+function Get-Access-Token-Client-Credentials {
+    Write-Host "Requesting access token using client credentials (Public mode)..." -ForegroundColor Yellow
+    
+    $body = @{
+        grant_type    = "client_credentials"
+        client_id     = $client_id
+        client_secret = $client_secret
+    }
+    
+    try {
+        $CurrentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $Response = Invoke-RestMethod -Uri "https://www.deviantart.com/oauth2/token" -Method Post -Body $body
+        
+        $Access_Token = $Response.access_token
+        Write-Host "Public mode Access_Token obtained." -ForegroundColor White
+
+        # Update database
+        $temp_query = "UPDATE Auth SET access_token = '$Access_Token', access_token_creation_date = '$CurrentDate'"
+        Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+        return $Access_Token
+    } catch {
+        Write-Host "(Get-Access-Token-Client-Credentials) Error: $($_.Exception.Message)" -ForegroundColor Red
+        return $null
+    }
+}
+
+function Get-Valid-DeviantArt-Token {
+    # 1. Check if existing access token is valid by date
+    if (-not (Check-if-Access-Token-Expired-Date)) {
+        $temp_query = "SELECT access_token FROM Auth"
+        $result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+        if ($result.access_token) { return $result.access_token }
+    }
+
+    # 2. Try to refresh using refresh_token if we have one (Private mode)
+    $temp_query = "SELECT refresh_token FROM Auth WHERE refresh_token IS NOT NULL"
+    $result = Invoke-SQLiteQuery -DataSource $DBFilePath -Query $temp_query
+    if ($result.refresh_token) {
+        # Check if refresh token itself is expired (90 days)
+        if (-not (Check-if-Refresh-Token-Expired)) {
+            Write-Host "Refreshing access token using refresh token..." -ForegroundColor Yellow
+            $token = Refresh-Access-Token
+            if ($token) { return $token }
+        }
+    }
+
+    # 3. Fallback to client_credentials (Public mode)
+    return Get-Access-Token-Client-Credentials
+}
+
+function Invoke-DeviantArtApi {
+    param (
+        [string]$Uri,
+        [string]$Method = "Get",
+        [hashtable]$Body = $null
+    )
+
+    $Token = Get-Valid-DeviantArt-Token
+    $Headers = @{
+        "Authorization"     = "Bearer $Token"
+        "dA-minor-version" = "20210526"
+    }
+
+    $RetryCount = 0
+    while ($RetryCount -lt 2) {
+        try {
+            if ($Method -eq "Post") {
+                $Response = Invoke-WebRequest -Uri $Uri -Method $Method -Headers $Headers -Body $Body -SkipHttpErrorCheck
+            } else {
+                $Response = Invoke-WebRequest -Uri $Uri -Method $Method -Headers $Headers -SkipHttpErrorCheck
+            }
+            
+            if ($Response.Content) {
+                $Json = $Response.Content | ConvertFrom-Json
+            }
+
+            # 401 Unauthorized - Token expired or invalid
+            if ($Response.StatusCode -eq 401 -or ($Json -and $Json.error -eq "invalid_token")) {
+                Write-Host "Access token invalid (401). Forcing refresh..." -ForegroundColor Yellow
+                # Invalidate the token in DB
+                $temp_query = "UPDATE Auth SET access_token_creation_date = '2000-01-01 00:00:00'"
+                Invoke-SqliteQuery -DataSource $DBFilePath -Query $temp_query
+                
+                # Update headers for retry
+                $Token = Get-Valid-DeviantArt-Token
+                $Headers["Authorization"] = "Bearer $Token"
+                $RetryCount++
+                continue
+            }
+            
+            return $Response
+        } catch {
+            Write-Host "Network error in Invoke-DeviantArtApi: $($_.Exception.Message)" -ForegroundColor Red
+            return $null
+        }
+    }
 }
 ####################################
 function Create-Database-If-It-Doesnt-Exist {
