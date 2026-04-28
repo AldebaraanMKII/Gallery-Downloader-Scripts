@@ -11,31 +11,7 @@ $Limit = 24
 ################# Please read https://www.deviantart.com/developers/authentication on how to obtain the $client_id and $client_secret
 ## make sure to use gallery-dl URI in your OAuth2 Redirect URI Whitelist in your app settings
 ## starting with the new OAuth2 2.1, $code_verifier and $code_challenge needs to be generated as well.
-## Uncomment this code and run it on a powershell console to get them both:
-############################################
-# function New-CodeVerifier {
-#    param([int]$length = 64)
-#    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
-#    $verifier = -join (1..$length | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
-#    return $verifier
-#}
-############################################
-##### Generate the code_challenge (S256 method)
-#function New-CodeChallenge {
-#    param([string]$code_verifier)
-#    $sha256 = [System.Security.Cryptography.SHA256]::Create()
-#    $bytes = [System.Text.Encoding]::UTF8.GetBytes($code_verifier)
-#    $hash = $sha256.ComputeHash($bytes)
-#
-#    ############################# Base64 URL-safe encoding (RFC 7636)
-#    $challenge = [Convert]::ToBase64String($hash) -replace '\+', '-' -replace '/', '_' -replace '=', ''
-#    return $challenge
-#}
-############################################
-# $code_verifier = New-CodeVerifier
-# $code_challenge = New-CodeChallenge -code_verifier $code_verifier
-# Write-Host "Code Verifier: $code_verifier"
-# Write-Host "Code Challenge: $code_challenge"
+## run Get-PKCE-Codes.ps1 to get the codes, then set $code_verifier and $code_challenge to them.
 ############################################
 $client_id = ""
 $client_secret = ""
