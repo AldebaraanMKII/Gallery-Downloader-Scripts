@@ -1649,6 +1649,95 @@ function Invoke-DeviantArtApi {
         }
     }
 }
+
+function Invoke-CivitAIApi {
+    param (
+        [string]$Uri,
+        [string]$Method = "Get"
+    )
+
+    $Headers = @{
+        "Authorization" = "Bearer $API_Key"
+    }
+
+    $RetryCount = 0
+    while ($RetryCount -lt $maxRetries) {
+        try {
+            $Response = Invoke-WebRequest -Uri $Uri -Method $Method -Headers $Headers -SkipHttpErrorCheck
+            
+            if ($Response.StatusCode -eq 429 -or $Response.StatusCode -ge 500) {
+                $delay = Calculate-Delay -retryCount $RetryCount
+                Write-Host "Error $($Response.StatusCode) encountered. Retrying in $delay ms..." -ForegroundColor Yellow
+                Start-Sleep -Milliseconds $delay
+                $RetryCount++
+                continue
+            }
+            
+            return $Response
+        } catch {
+            Write-Host "Network error in Invoke-CivitAIApi: $($_.Exception.Message)" -ForegroundColor Red
+            return $null
+        }
+    }
+}
+
+function Invoke-KemonoApi {
+    param (
+        [string]$Uri,
+        [string]$Method = "Get"
+    )
+
+    $Headers = @{
+        "Accept" = "text/css"
+    }
+
+    $RetryCount = 0
+    while ($RetryCount -lt $maxRetries) {
+        try {
+            $Response = Invoke-WebRequest -Uri $Uri -Method $Method -Headers $Headers -SkipHttpErrorCheck
+            
+            if ($Response.StatusCode -eq 429 -or $Response.StatusCode -ge 500) {
+                $delay = Calculate-Delay -retryCount $RetryCount
+                Write-Host "Error $($Response.StatusCode) encountered. Retrying in $delay ms..." -ForegroundColor Yellow
+                Start-Sleep -Milliseconds $delay
+                $RetryCount++
+                continue
+            }
+            
+            return $Response
+        } catch {
+            Write-Host "Network error in Invoke-KemonoApi: $($_.Exception.Message)" -ForegroundColor Red
+            return $null
+        }
+    }
+}
+
+function Invoke-Rule34xxxApi {
+    param (
+        [string]$Uri,
+        [string]$Method = "Get"
+    )
+
+    $RetryCount = 0
+    while ($RetryCount -lt $maxRetries) {
+        try {
+            $Response = Invoke-WebRequest -Uri $Uri -Method $Method -SkipHttpErrorCheck
+            
+            if ($Response.StatusCode -eq 429 -or $Response.StatusCode -ge 500) {
+                $delay = Calculate-Delay -retryCount $RetryCount
+                Write-Host "Error $($Response.StatusCode) encountered. Retrying in $delay ms..." -ForegroundColor Yellow
+                Start-Sleep -Milliseconds $delay
+                $RetryCount++
+                continue
+            }
+            
+            return $Response
+        } catch {
+            Write-Host "Network error in Invoke-Rule34xxxApi: $($_.Exception.Message)" -ForegroundColor Red
+            return $null
+        }
+    }
+}
 ####################################
 function Create-Database-If-It-Doesnt-Exist {
 	param (

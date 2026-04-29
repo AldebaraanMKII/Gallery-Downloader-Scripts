@@ -295,6 +295,7 @@ function Download-Metadata-From-User {
 				}
 				try {
 					$URL = "https://www.deviantart.com/api/v1/oauth2/gallery/all?username=$($Username)&offset=$($Cur_Offset)&limit=$($Limit)&mature_content=$($AllowMatureContent)"
+					Write-Host "URL: $URL" -ForegroundColor Yellow
 					$Result = Invoke-DeviantArtApi -Uri $URL -Method Get
                     if ($null -eq $Result) {
                         Write-Host "Failed to fetch gallery for user $Username." -ForegroundColor Red
